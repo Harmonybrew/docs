@@ -2,7 +2,7 @@
 
 Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHarmony 设备上写起代码，我们做了一些“分外之事”。
 
-针对系统环境的诸多限制（如代码签名、平台标识等），我们专门维护了一系列特色软件包，优化了 C/C++、Rust、Python 等场景的开发体验。
+针对系统环境的诸多限制（如代码签名、平台标识等），我们专门维护了一系列特色软件包，优化了 C/C++、Rust、Python、Node.js 等场景的开发体验。
 
 我们替你填平了这些底层的“坑”，只为让 OpenHarmony 上的操作逻辑能重新对齐你熟悉的 Linux 或 macOS。
 
@@ -199,3 +199,57 @@ EOF
 # 执行脚本
 python3 test.py
 ```
+
+### 场景四：编译 Node.js addon
+
+在 npm 中心仓中，部分三方库使用到了 addon 技术。例如 sqlite3、node-sass、bufferutil 等。
+
+在这部分三方库中，能为 OpenHarmony 平台提供预构建产物的库寥寥无几，我们并不能在 OpenHarmony 平台上对这些库“开箱即用”。
+
+所幸的是，大多数 addon 都支持在没有预构建产物的情况下回退到实时构建。在本地工具链完备的情况下，我们可以在 OpenHarmony 平台上对这些库进行实时构建并使用它们。
+
+借助 Harmonybrew 提供的开发工具，我们可以很方便地完成这一操作。
+
+例如，在鸿蒙 PC 的 HiShell 环境中实时构建三方库 bufferutil：
+
+```sh
+# 安装 node 和开发工具（在此场景中 python 也属于开发工具，因为 node-gyp 依赖它）
+brew install node python devel-base
+
+cd ~
+mkdir test-bufferutil
+cd test-bufferutil
+
+# 设置 Node.js 镜像
+# node-gyp 会根据这个地址去下载 Node.js 头文件，这里设置成国内源以避免因网络问题下载失败
+export npm_package_config_node_gyp_dist_url=https://mirrors.huaweicloud.com/nodejs
+
+# 安装 bufferutil
+# 由于 bufferutil 官方未提供 OpenHarmony 平台的预构建包，它会触发实时构建
+npm install bufferutil
+
+# 检查实时构建产物是否已经正确生成
+# 注意，这个 .node 文件已经默认带有了代码签名（因为是用封装过的 ohos-sdk 工具链进行构建的），
+# 所以 Node.js 运行时可以正常加载它
+ls -l node_modules/bufferutil/build/Release/bufferutil.node
+
+# 编写一个测试脚本，测试这个库能否正常工作
+cat << 'EOF' > test.js
+const bufferUtil = require('bufferutil');
+const crypto = require('crypto');
+
+const source = crypto.randomBytes(10);
+const mask = crypto.randomBytes(4);
+
+console.log(source, mask)
+bufferUtil.mask(source, mask, source, 0, source.length);
+console.log(source)
+bufferUtil.unmask(source, mask);
+console.log(source)
+EOF
+
+# 执行测试脚本，观察结果
+node test.js
+```
+
+> 该方案仅适用于需要实时构建的场景。对于三方库已经提供了预构建产物但未进行代码签名的场景（如 rollup、rolldown 等），请使用 [ohos-signpost](https://github.com/hqzing/ohos-signpost) 进行处理。

@@ -155,7 +155,7 @@ vim out.diff
 
 ## 为什么选择 Homebrew 而不是别的包管理器？
 
-首先需要明确：Harmonybrew 是一个由社区发起的开源项目，其技术选型由项目创建者 [@hqzing](https://atomgit.com/hqzing) 基于个人调研独立做出。此选型与 OpenHarmony 社区或相关 PC 产品的官方规划均无直接或间接关系。应避免误解为“鸿蒙选择了 Homebrew”或“鸿蒙 PC 选择了 Homebrew”。
+首先需要明确：Harmonybrew 是一个由社区发起的开源项目，其技术选型由项目创建者 [@hqzing](https://atomgit.com/hqzing) 基于个人调研独立做出。此选型与 OpenHarmony 社区或相关 PC 产品的官方规划无关。应避免误解为“鸿蒙选择了 Homebrew”或“鸿蒙 PC 选择了 Homebrew”。
 
 在针对 OpenHarmony 系统进行包管理器方案调研时（详见 @hqzing 编写的技术博客：[Linux包管理器生态漫谈](https://blog.csdn.net/hqzing/article/details/158005274)），@hqzing 认为 Homebrew 的交互逻辑和生态特征更契合个人 PC 用户的使用习惯。考虑到 PC 终端在鸿蒙生态中的重要性，决定重点开展 Homebrew 的移植工作。
 
