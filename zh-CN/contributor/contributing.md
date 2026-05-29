@@ -93,9 +93,7 @@
     </tr>
     <tr>
       <td>
-        <a href="https://atomgit.com/Harmonybrew/uname-is-linux"
-          >uname-is-linux</a
-        >
+        <a href="https://atomgit.com/Harmonybrew/uname-is-linux">uname-is-linux</a>
       </td>
       <td>系统标识伪装工具</td>
       <td>新建</td>
@@ -104,9 +102,7 @@
     </tr>
     <tr>
       <td>
-        <a href="https://atomgit.com/Harmonybrew/ohos-pip-autosign"
-          >ohos-pip-autosign</a
-        >
+        <a href="https://atomgit.com/Harmonybrew/ohos-pip-autosign">ohos-pip-autosign</a>
       </td>
       <td>Python 三方库自动签名工具</td>
       <td>新建</td>
@@ -115,9 +111,7 @@
     </tr>
     <tr>
       <td>
-        <a href="https://atomgit.com/Harmonybrew/custom-tap-example"
-          >custom-tap-example</a
-        >
+        <a href="https://atomgit.com/Harmonybrew/custom-tap-example">custom-tap-example</a>
       </td>
       <td>自定义 tap 样例</td>
       <td>新建</td>
@@ -131,17 +125,16 @@
       <td>各种鸿蒙移植版本的开源软件</td>
       <td>新建</td>
       <td>
-        主要供 Harmonybrew
-        项目内部使用，作为我们基础设施的一部分。但项目都是开源的，其他人想用也可以拿去用。这些仓库托管在
+        主要供 Harmonybrew 项目内部使用，用于构建
+        <a href="https://atomgit.com/Harmonybrew/ci/blob/main/ci-runner/Dockerfile">ci-runner</a>
+        镜像。但项目都是开源的，其他人想用也可以拿去用。这些仓库托管在
         GitHub 平台而不是 AtomGit 平台（为了使用 GitHub 的流水线）。
       </td>
       <td>由 Harmonybrew 维护团队例行维护，暂不接纳 PR 贡献。</td>
     </tr>
     <tr>
       <td>
-        <a href="https://github.com/Harmonybrew/maintenance-tools"
-          >maintenance-tools</a
-        >
+        <a href="https://github.com/Harmonybrew/maintenance-tools">maintenance-tools</a>
       </td>
       <td>Harmonybrew 项目维护工具</td>
       <td>新建</td>

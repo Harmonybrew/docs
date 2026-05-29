@@ -72,7 +72,11 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
 
 ### 场景一：编译 C/C++ 程序
 
-在鸿蒙 PC 的 HiShell 环境中编译开源软件 gzip：
+在鸿蒙 PC 上编译传统的 C/C++ 开源软件（如 gzip 等）时，通常会面临一个问题：许多开源软件的构建脚本无法识别 OpenHarmony 特有的系统标识，导致配置或编译失败。
+
+为了对齐传统的 Linux 编译体验，Harmonybrew 提供了 uname-is-linux 伪装工具，通过劫持系统调用将系统标识伪装为 Linux，从而让各种开源软件能够无缝完成构建。
+
+在鸿蒙 PC 的 HiShell 环境中编译开源软件 gzip 的完整流程如下：
 
 ```sh
 # 安装编译工具链和环境伪装工具
@@ -111,15 +115,16 @@ $PREFIX/bin/gzip --help
 
 # 清理临时目录和工作目录
 sh -c "rm -rf $TMPDIR/* $WORKDIR/*"
+
 ```
 
 ### 场景二：编译 Rust 程序
 
-用法1：安装 llvm-gcc-compat，让 llvm-gcc-compat 提供 cc 命令供 rustc 使用。用户无需再额外通过 config.toml 来配置 linker 路径。
+**用法 1：安装 llvm-gcc-compat**
 
-在不配置任何 config.toml 的情况下，rustc 默认会调用 cc 命令作为 linker。
+让 llvm-gcc-compat 提供 cc 命令供 rustc 使用。用户无需再额外通过 config.toml 来配置 linker 路径。
 
-这个 cc 命令实际上是个软链接，指向了 ohos-sdk 里面的 clang 驱动器。
+在不配置任何 config.toml 的情况下，rustc 默认会调用 cc 命令作为 linker。这个 cc 命令实际上是个软链接，指向了 ohos-sdk 里面的 clang 驱动器。
 
 clang 驱动器在进行链接操作时，调用的是经过我们封装的 ld.lld 脚本，因此最终 rustc 编译出来的二进制都会默认带有代码签名，可直接在鸿蒙 PC 上运行。
 
@@ -139,9 +144,12 @@ cargo build --release
 
 # 测试编译产物是否能正常运行
 ./target/release/hello_project
+
 ```
 
-用法 2：不安装 llvm-gcc-compat，仅安装 ohos-sdk。用户需要额外配置 config.toml 指定使用 ohos-sdk 里面的 clang 驱动器作为 linker。
+**用法 2：不安装 llvm-gcc-compat，仅安装 ohos-sdk**
+
+用户需要额外配置 config.toml 指定使用 ohos-sdk 里面的 clang 驱动器作为 linker。
 
 clang 驱动器在进行链接操作时，调用的是经过我们封装的 ld.lld 脚本，因此最终 rustc 编译出来的二进制都会默认带有代码签名，可直接在鸿蒙 PC 上运行。
 
@@ -169,11 +177,20 @@ cargo build --release
 
 # 测试编译产物是否能正常运行
 ./target/release/hello_project
+
 ```
 
 ### 场景三：安装 Python 三方库
 
-在鸿蒙 PC 的 HiShell 环境中安装 numpy：
+Harmonybrew 核心 tap 里面提供的 Python 经过了定制化适配，详情请参见 [python@3.14.rb](https://atomgit.com/Harmonybrew/homebrew-core/blob/main/Formula/p/python@3.14.rb)。
+
+由于 Python 官方目前尚未原生支持 aarch64-linux-ohos 平台，为了确保用户能够使用三方库（尤其是包含原生模块的库），我们将它的平台三元组硬编码为了 aarch64-linux-musl。得益于 OpenHarmony 对 Linux 的兼容性，Python 可以直接复用 Linux 现有的生态，直接下载并运行 aarch64-linux-musl 平台的原生二进制制品（如 numpy、scipy 等）。
+
+该方案在常规 OpenHarmony 设备上均可正常工作，但在鸿蒙 PC 上会面临一个特有的安全限制：当你用 pip 安装这类三方库时，下载到的 so 文件（如 xxx-aarch64-linux-musl\.so）必然不具备鸿蒙 PC 的代码签名，直接加载会导致系统校验失败。
+
+ohos-pip-autosign 便是为了解决这一痛点而生的工具，它能在 pip 安装过程中自动为这些 so 文件补全代码签名。
+
+以 numpy 为例，在鸿蒙 PC 的 HiShell 环境中安装它的完整流程如下：
 
 ```sh
 # 安装 Python 运行时和自动签名工具
@@ -198,19 +215,18 @@ EOF
 
 # 执行脚本
 python3 test.py
+
 ```
 
 ### 场景四：编译 Node.js addon
 
-在 npm 中心仓中，部分三方库使用到了 addon 技术。例如 sqlite3、node-sass、bufferutil 等。
+在 npm 中心仓中，部分三方库包含 C/C++ addon，如 sqlite3、node-sass、bufferutil 等。
 
-在这部分三方库中，能为 OpenHarmony 平台提供预构建产物的库寥寥无几，我们并不能在 OpenHarmony 平台上对这些库“开箱即用”。
+由于极少有官方社区会为 OpenHarmony 平台提供预构建产物，导致这些库在鸿蒙设备上无法开箱即用。所幸的是，大多数 addon 都支持在缺少预构建包时自动回退到本地实时构建。
 
-所幸的是，大多数 addon 都支持在没有预构建产物的情况下回退到实时构建。在本地工具链完备的情况下，我们可以在 OpenHarmony 平台上对这些库进行实时构建并使用它们。
+借助 Harmonybrew 提供的开发工具，我们可以在本地轻松完成这一构建过程，让这些库能够在 OpenHarmony 平台上工作。
 
-借助 Harmonybrew 提供的开发工具，我们可以很方便地完成这一操作。
-
-例如，在鸿蒙 PC 的 HiShell 环境中实时构建三方库 bufferutil：
+以在鸿蒙 PC 的 HiShell 环境中实时构建三方库 bufferutil 为例，流程如下：
 
 ```sh
 # 安装 node 和开发工具（在此场景中 python 也属于开发工具，因为 node-gyp 依赖它）
@@ -250,6 +266,7 @@ EOF
 
 # 执行测试脚本，观察结果
 node test.js
+
 ```
 
-> 该方案仅适用于需要实时构建的场景。对于三方库已经提供了预构建产物但未进行代码签名的场景（如 rollup、rolldown 等），请使用 [ohos-signpost](https://github.com/hqzing/ohos-signpost) 进行处理。
+> 💡 **提示**：该方案仅适用于需要实时构建的场景。对于三方库已经提供了预构建产物但未进行代码签名的场景（如 rollup、rolldown 等），请使用 [ohos-signpost](https://github.com/hqzing/ohos-signpost) 进行处理。
