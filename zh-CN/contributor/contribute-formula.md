@@ -211,6 +211,12 @@ git push my-fork main:sevenzip
 | 修订版本升级 | `<formula>: revision bump to <reason>` | `marp-cli: revision bump to node@24` |
 | 修复/增强    | `<formula>: <action>`                  | `tcl-tk: update livecheck blocks`    |
 
+<br/>
+
+提交规则约束：
+
+需遵循“一个 PR -> 一个 commit -> 一个 formula”的原则。一个 PR 不允许包含多个 commit。一个 commit 不允许新增/修改多个 formula 文件，只允许新增/修改单个 formula 文件及其关联资源（Patches、Aliases 等）。若违反规则，流水线会拒绝执行并给出报错。
+
 ### 5.3 提交 PR
 
 去 AtomGit 网页上操作，从自己的个人仓往 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core) 提交 PR。
@@ -243,9 +249,47 @@ PR 提交完成后，HarmonybrewBot 机器人会自动生成一个同名的“�
 
 建议在熟悉手动流程后，按照该仓库 README 的指引配置使用，这能极大地节省大批量软件包录入时的重复劳动。
 
-## 7 附录：补丁制作指南
+## 7 进阶玩法：使用 AI agent 进行 formula 适配
 
-### 7.1 进入 superenv
+如今的 AI agent 能力已经相当强大，即使在不预设知识库和技能集的情况下，往往也能自动化完成 formula 的鸿蒙适配。
+
+在我们的核心 tap 中，对于那些不能直接继承上游的 formula，里面有一部分便是纯靠 AI 完成的适配，例如 util-linux、openssh、go 等。
+
+这里以 AtomCode 工具为例，演示如何基于这个工具完成一个 formula 的适配：
+
+1. 在 ci-runner 中安装并启动 AtomCode。
+
+   ```sh
+   brew update
+   brew install atomcode
+   atomcode
+   ```
+
+2. 登录 AtomGit 账号或手动配置 provider，对接好你的所需的大模型。
+3. 下发指令，让其自动编包、定位问题、制作补丁。
+
+   例如：
+
+   ```txt
+   你现在正位于一个鸿蒙（OpenHarmony）设备上，里面有各种开发工具和一个鸿蒙移植版本的 Homebrew。
+
+   我想将 Homebrew 上游的 util-linux 这个 formula 移植到我的平台上，请帮我完成移植：
+   https://raw.githubusercontent.com/Homebrew/homebrew-core/refs/heads/main/Formula/u/util-linux.rb
+
+   注意事项：
+   1. 最新版本的 Homebrew 已经支持本地补丁（仓内补丁）。如果产生了补丁，请以本地补丁的方式引用。
+      示例：
+      patch do
+        file "Patches/perl/0001-add-ohos-support.patch"
+      end
+   2. Homebrew 在鸿蒙平台上的业务逻辑全部走 Linux 的业务逻辑。如果需要修改 formula，可以直接修改 Linux 部分的逻辑。不用担心影响其他平台的表现，这是个 fork 版本，不影响其他平台。
+   3. 如果需要在 C/C++ 源代码中添加条件编译宏，可使用 __OHOS__ 这个宏来作为判断条件，鸿蒙平台上的编译器会自动传入这个宏。
+   4. 编译构建任务耗时较长，所有构建任务请以 background 模式运行，避免因超时被杀进程需要重新来过。
+   ```
+
+## 8 附录：补丁制作指南
+
+### 8.1 进入 superenv
 
 Homebrew 默认在 **superenv**（超级编译环境）中构建。它通过**环境变量注入**（如 `CFLAGS`）和**编译器劫持**（使用 shim 垫片脚本代替系统的 `gcc` 等命令）来屏蔽宿主环境的差异，确保构建环境的标准化与一致性。
 
@@ -257,7 +301,7 @@ brew install -s -i <formula>
 
 执行后，Homebrew 会完成下载、解压、应用已有补丁等前序动作，最后启动一个交互式终端并停留在源码目录。这相当于让你身处 formula 里面的 `install` 函数内部进行手工调试。
 
-### 7.2 进行手工构建
+### 8.2 进行手工构建
 
 进入 superenv 的交互式终端后，你就可以按照 formula 里面的 `install` 函数的逻辑进行手工构建（例如自己执行 `./configure`、`make` 等命令）。
 
@@ -270,7 +314,7 @@ brew install -s -i <formula>
 > 1. [aports](https://gitlab.alpinelinux.org/alpine/aports)：Alpine Linux 的软件仓库。由于其 C 标准库采用 musl libc，该仓库中积累了大量针对非 glibc 环境的兼容性补丁，是解决 C 标准库差异的重要参考。
 > 2. [termux-packages](https://github.com/termux/termux-packages)：Termux 的软件仓库。Termux 在 Android 平台上积累了丰富的应用沙箱与非 FHS 路径的适配实践，相关补丁对于解决 OpenHarmony 应用沙箱环境下的难题极具借鉴价值。
 
-### 7.3 制作补丁
+### 8.3 制作补丁
 
 适配完成后，需制作标准补丁文件。推荐做法如下：
 
@@ -281,7 +325,7 @@ brew install -s -i <formula>
    diff -ruN path/to/clean_source path/to/modified_source > 0001-add-ohos-support.patch
    ```
 
-### 7.4 本地验证
+### 8.4 本地验证
 
 在将补丁正式贡献给社区之前，需在个人环境验证其有效性：
 
@@ -294,13 +338,13 @@ brew install -s -i <formula>
    示例：
 
    ```rb
-   patch do
-     file "Patches/perl/0001-add-ohos-support.patch"
-   end
+     patch do
+       file "Patches/perl/0001-add-ohos-support.patch"
+     end
    ```
 
 3. **验证补丁**：退出 superenv，执行 `brew install -s -v <formula>` 验证构建是否通过。
 
-### 7.5 提交 PR
+### 8.5 提交 PR
 
 在本地验证通过并确认无误后，将 formula 和补丁一同提交至 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core) 仓库。

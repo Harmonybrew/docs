@@ -2,7 +2,7 @@
 
 Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHarmony 设备上写起代码，我们做了一些“分外之事”。
 
-针对系统环境的诸多限制（如代码签名、平台标识等），我们专门维护了一系列特色软件包，优化了 C/C++、Rust、Python、Node.js 等场景的开发体验。
+针对系统环境的诸多限制（如代码签名、平台标识等），我们专门维护了一系列特色软件包，优化了 C/C++、Rust、Python、Node.js、Go 等场景的开发体验。
 
 我们替你填平了这些底层的“坑”，只为让 OpenHarmony 上的操作逻辑能重新对齐你熟悉的 Linux 或 macOS。
 
@@ -232,7 +232,6 @@ python3 test.py
 # 安装 node 和开发工具（在此场景中 python 也属于开发工具，因为 node-gyp 依赖它）
 brew install node python devel-base
 
-cd ~
 mkdir test-bufferutil
 cd test-bufferutil
 
@@ -269,4 +268,67 @@ node test.js
 
 ```
 
-> 💡 **提示**：该方案仅适用于需要实时构建的场景。对于三方库已经提供了预构建产物但未进行代码签名的场景（如 rollup、rolldown 等），请使用 [ohos-signpost](https://github.com/hqzing/ohos-signpost) 进行处理。
+> 💡 **提示**：该方案仅适用于需要实时构建的场景。对于三方库已经提供了预构建产物但未进行代码签名的场景（如 rollup、rolldown 等），请使用 [ohos-signpost](https://github.com/hqzing/ohos-signpost) 进行处理。具体实践案例可参见 [@hqzing](https://atomgit.com/hqzing) 编写的技术博客：[在鸿蒙PC上使用CodeArts IDE进行前端开发](https://blog.csdn.net/hqzing/article/details/156149868)。
+
+### 场景五：编译 Go 程序
+
+我们在 go 命令行工具的构建管道中打了一个 [自动签名补丁](https://atomgit.com/Harmonybrew/homebrew-core/blob/main/Patches/go/0003-auto-sign-elf.patch)，使 go 在产出 ELF 二进制文件时自动调用 binary-sign-tool 进行代码签名，编译出来的程序无需手动签名即可直接在鸿蒙 PC 上运行。
+
+由于 binary-sign-tool 来自 ohos-sdk，我们让 go 级联依赖了 ohos-sdk，这意味着你只需安装 go 这一个包，ohos-sdk 便会被自动下载并配置好。
+
+在鸿蒙 PC 的 HiShell 环境中编译并运行一个简单的 Go 程序，操作是这样的：
+
+```sh
+# 安装 go（ohos-sdk 会作为级联依赖自动引入）
+brew install go
+
+mkdir go-example
+cd go-example
+
+# 编写一个简单的 Go 程序
+cat > hello.go << 'EOF'
+package main
+
+import "fmt"
+
+func main() {
+    fmt.Println("Hello!")
+}
+EOF
+
+# 编译并运行
+go build -o hello hello.go
+./hello
+
+```
+
+对于涉及 cgo 的场景，Go 默认会调用 cc 命令作为外部链接器。我们可以安装 llvm-gcc-compat，让它提供 cc 命令（指向 ohos-sdk 中的 clang）。如此一来，cgo 编译可直接开箱即用：
+
+```sh
+# 安装 go 和 llvm-gcc-compat（提供 cc 命令供 cgo 使用）
+brew install go llvm-gcc-compat
+
+mkdir cgo-example
+cd cgo-example
+
+# 编写一个 cgo 程序
+cat > hello_cgo.go << 'EOF'
+package main
+
+/*
+#include <stdio.h>
+void hello() { printf("%s\n", "Hello from cgo!"); fflush(stdout); }
+*/
+import "C"
+
+func main() {
+    C.hello()
+}
+EOF
+
+# 编译并运行
+go mod init hello-cgo
+CGO_ENABLED=1 go build -o hello_cgo .
+./hello_cgo
+
+```
