@@ -115,7 +115,6 @@ $PREFIX/bin/gzip --help
 
 # 清理临时目录和工作目录
 sh -c "rm -rf $TMPDIR/* $WORKDIR/*"
-
 ```
 
 ### 场景二：编译 Rust 程序
@@ -144,7 +143,6 @@ cargo build --release
 
 # 测试编译产物是否能正常运行
 ./target/release/hello_project
-
 ```
 
 **用法 2：不安装 llvm-gcc-compat，仅安装 ohos-sdk**
@@ -177,7 +175,6 @@ cargo build --release
 
 # 测试编译产物是否能正常运行
 ./target/release/hello_project
-
 ```
 
 ### 场景三：安装 Python 三方库
@@ -215,7 +212,6 @@ EOF
 
 # 执行脚本
 python3 test.py
-
 ```
 
 ### 场景四：编译 Node.js addon
@@ -265,7 +261,6 @@ EOF
 
 # 执行测试脚本，观察结果
 node test.js
-
 ```
 
 > 💡 **提示**：该方案仅适用于需要实时构建的场景。对于三方库已经提供了预构建产物但未进行代码签名的场景（如 rollup、rolldown 等），请使用 [ohos-signpost](https://github.com/hqzing/ohos-signpost) 进行处理。具体实践案例可参见 [@hqzing](https://atomgit.com/hqzing) 编写的技术博客：[在鸿蒙PC上使用CodeArts IDE进行前端开发](https://blog.csdn.net/hqzing/article/details/156149868)。
@@ -299,7 +294,6 @@ EOF
 # 编译并运行
 go build -o hello hello.go
 ./hello
-
 ```
 
 对于涉及 cgo 的场景，Go 默认会调用 cc 命令作为外部链接器。我们可以安装 llvm-gcc-compat，让它提供 cc 命令（指向 ohos-sdk 中的 clang）。如此一来，cgo 编译可直接开箱即用：
@@ -327,8 +321,6 @@ func main() {
 EOF
 
 # 编译并运行
-go mod init hello-cgo
-CGO_ENABLED=1 go build -o hello_cgo .
+CGO_ENABLED=1 go build -o hello_cgo hello_cgo.go
 ./hello_cgo
-
 ```

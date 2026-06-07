@@ -249,9 +249,9 @@ PR 提交完成后，HarmonybrewBot 机器人会自动生成一个同名的“�
 
 建议在熟悉手动流程后，按照该仓库 README 的指引配置使用，这能极大地节省大批量软件包录入时的重复劳动。
 
-## 7 进阶玩法：使用 AI agent 进行 formula 适配
+## 7 进阶玩法：使用 AI Agent 进行 formula 适配
 
-如今的 AI agent 能力已经相当强大，即使在不预设知识库和技能集的情况下，往往也能自动化完成 formula 的鸿蒙适配。
+如今的 AI Agent 能力已经相当强大，即使在不预设知识库和技能集的情况下，往往也能自动化完成 formula 的鸿蒙适配。
 
 在我们的核心 tap 中，对于那些不能直接继承上游的 formula，里面有一部分便是纯靠 AI 完成的适配，例如 util-linux、openssh、go 等。
 
@@ -260,8 +260,8 @@ PR 提交完成后，HarmonybrewBot 机器人会自动生成一个同名的“�
 1. 在 ci-runner 中安装并启动 AtomCode。
 
    ```sh
-   brew update
-   brew install atomcode
+   curl -fsSL https://raw.atomgit.com/atomgit_atomcode/atomcode/raw/main/scripts/install.sh | sh
+
    atomcode
    ```
 
