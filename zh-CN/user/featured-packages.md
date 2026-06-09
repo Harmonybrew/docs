@@ -263,7 +263,7 @@ EOF
 node test.js
 ```
 
-> 💡 **提示**：该方案仅适用于需要实时构建的场景。对于三方库已经提供了预构建产物但未进行代码签名的场景（如 rollup、rolldown 等），请使用 [ohos-signpost](https://github.com/hqzing/ohos-signpost) 进行处理。具体实践案例可参见 [@hqzing](https://atomgit.com/hqzing) 编写的技术博客：[在鸿蒙PC上使用CodeArts IDE进行前端开发](https://blog.csdn.net/hqzing/article/details/156149868)。
+> 💡 **提示**：该方案仅适用于需要实时构建的场景。对于三方库已经提供了预构建产物但未进行代码签名的场景（如 rollup、rolldown 等），请使用 [ohos-signpost](https://github.com/hqzing/ohos-signpost) 进行处理。具体实践案例可参见 [这篇博客](https://blog.csdn.net/hqzing/article/details/156149868)。
 
 ### 场景五：编译 Go 程序
 
