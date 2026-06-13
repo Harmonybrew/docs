@@ -181,7 +181,7 @@ cargo build --release
 
 Harmonybrew 核心 tap 里面提供的 Python 经过了定制化适配，详情请参见 [python@3.14.rb](https://atomgit.com/Harmonybrew/homebrew-core/blob/main/Formula/p/python@3.14.rb)。
 
-由于 Python 官方目前尚未原生支持 aarch64-linux-ohos 平台，为了确保用户能够使用三方库（尤其是包含原生模块的库），我们将它的平台三元组硬编码为了 aarch64-linux-musl。得益于 OpenHarmony 对 Linux 的兼容性，Python 可以直接复用 Linux 现有的生态，直接下载并运行 aarch64-linux-musl 平台的原生二进制制品（如 numpy、scipy 等）。
+由于 Python 官方目前尚未原生支持 aarch64-linux-ohos 平台，为了确保用户能够使用三方库（尤其是包含原生模块的三方库），我们将它的平台三元组硬编码为 aarch64-linux-musl。得益于 OpenHarmony 对 Linux 的兼容性，Python 可以直接复用 Linux 现有的生态，直接下载并运行 aarch64-linux-musl 平台的原生二进制制品（如 numpy、scipy 等）。
 
 该方案在常规 OpenHarmony 设备上均可正常工作，但在鸿蒙 PC 上会面临一个特有的安全限制：当你用 pip 安装这类三方库时，下载到的 so 文件（如 xxx-aarch64-linux-musl\.so）必然不具备鸿蒙 PC 的代码签名，直接加载会导致系统校验失败。
 

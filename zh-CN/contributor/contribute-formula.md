@@ -235,7 +235,7 @@ PR 提交完成后，HarmonybrewBot 机器人会自动生成一个同名的“�
 **如果流水线构建成功：**
 
 - **“替代 PR”与原始 PR 均会被合并**：机器人会定期扫描并合并构建成功的 PR（当前扫描周期为 10 分钟）。机器人检查到构建成功后，会首先合并“替代 PR”。随后，你的原始 PR 也会随之自动变更为“已合并”状态。
-- **软件包将会入库**：在 PR 合并后，软件包正式进入制品仓库。受 CDN 缓存刷新策略影响，新版本最长需要 10 分钟的生效延迟，届时其他用户即可下载到你录入或修改的软件包。
+- **软件包将会入库**：在 PR 合并后，流水线会继续在后台运行，重新生成包索引。一般需要几分钟时间才能完成包索引的更新，届时其他用户即可下载到你录入或修改的软件包。
 
 **如果流水线构建失败：**
 
@@ -293,62 +293,45 @@ PR 提交完成后，HarmonybrewBot 机器人会自动生成一个同名的“�
 
 ## 8 附录：补丁制作指南
 
-### 8.1 进入 superenv
+### 8.1 准备源码
 
-Homebrew 默认在 **superenv**（超级编译环境）中构建。它通过**环境变量注入**（如 `CFLAGS`）和**编译器劫持**（使用 shim 垫片脚本代替系统的 `gcc` 等命令）来屏蔽宿主环境的差异，确保构建环境的标准化与一致性。
+下载源码包，将源码包解压两次，得到两份干净的源码。这里假设源码目录名字分别为 a 和 b。
 
-为了复现编译报错，必须先进入该环境：
+### 8.2 修改源码
 
-```sh
-brew install -s -i <formula>
-```
+修改目录 b 中的源码，对其进行业务适配。
 
-执行后，Homebrew 会完成下载、解压、应用已有补丁等前序动作，最后启动一个交互式终端并停留在源码目录。这相当于让你身处 formula 里面的 `install` 函数内部进行手工调试。
-
-### 8.2 进行手工构建
-
-进入 superenv 的交互式终端后，你就可以按照 formula 里面的 `install` 函数的逻辑进行手工构建（例如自己执行 `./configure`、`make` 等命令）。
-
-手工构建时请务必确保自己的构建行为与 `install` 函数中的行为完全一致。如果你不确定它到底执行了哪些操作，可以先在 superenv 之外执行 `brew install -s -v <formula>` 来观察构建日志，从中得到具体的构建命令。
-
-当你通过手工构建复现了之前的报错后，就可以着手处理它了。你可以直接在终端里对源码进行适配修改，改完代码后继续在当前环境下执行构建命令，直到构建顺利通过。
-
-> 本项目不会专门提供鸿蒙适配相关的指导，仅在力所能及的范围内分享一些参考资料：
->
-> 1. [aports](https://gitlab.alpinelinux.org/alpine/aports)：Alpine Linux 的软件仓库。由于其 C 标准库采用 musl libc，该仓库中积累了大量针对非 glibc 环境的兼容性补丁，是解决 C 标准库差异的重要参考。
-> 2. [termux-packages](https://github.com/termux/termux-packages)：Termux 的软件仓库。Termux 在 Android 平台上积累了丰富的应用沙箱与非 FHS 路径的适配实践，相关补丁对于解决 OpenHarmony 应用沙箱环境下的难题极具借鉴价值。
+本项目不会专门提供鸿蒙适配相关的指导，仅在力所能及的范围内分享一些参考资料：
+1. [aports](https://gitlab.alpinelinux.org/alpine/aports)：Alpine Linux 的软件仓库。由于其 C 标准库采用 musl libc，该仓库中积累了大量针对非 glibc 环境的兼容性补丁，是解决 C 标准库差异的重要参考。
+2. [termux-packages](https://github.com/termux/termux-packages)：Termux 的软件仓库。Termux 在 Android 平台上积累了丰富的应用沙箱与非 FHS 路径的适配实践，相关补丁对于解决 OpenHarmony 应用沙箱环境下的难题极具借鉴价值。
 
 ### 8.3 制作补丁
 
 适配完成后，需制作标准补丁文件。推荐做法如下：
 
-1. **清理环境**：在 superenv 中执行 `make clean`（或同类命令）清理构建产物。
-2. **生成 Diff**：另找一处存放同版本的“干净源码”，使用 `diff` 工具生成补丁：
-   ```sh
-   # -r: 递归目录; -u: 统一格式; -N: 处理缺失文件;
-   diff -ruN path/to/clean_source path/to/modified_source > 0001-add-ohos-support.patch
-   ```
+```sh
+# -r: 递归目录; -u: 统一格式; -N: 处理缺失文件;
+diff -ruN a b > 0001-add-ohos-support.patch
+```
 
-### 8.4 本地验证
+### 8.4 引入补丁
 
-在将补丁正式贡献给社区之前，需在个人环境验证其有效性：
+在核心 tap 仓库的 `Patches` 目录下创建一个与 formula 同名的子目录，将补丁放置其中。示例：`Patches/perl/0001-add-ohos-support.patch`
 
-1. **放置补丁**：在核心 tap 仓库的 `Patches` 目录下创建一个与 formula 同名的子目录，将补丁放置其中。
+然后在本地 formula 中加入 `patch` 块，指向补丁文件：
 
-   示例：`Patches/perl/0001-add-ohos-support.patch`
+```rb
+  patch do
+    file "Patches/perl/0001-add-ohos-support.patch"
+  end
+```
 
-2. **引用补丁**：在本地 formula 中加入 `patch` 块，指向补丁文件：
+### 8.5 验证补丁
 
-   示例：
+执行 `brew install -s -v <formula>`、`brew test <formula>` 验证构建和测试是否通过。如果不通过，需要重新制作补丁、重新验证，直至验证通过。
 
-   ```rb
-     patch do
-       file "Patches/perl/0001-add-ohos-support.patch"
-     end
-   ```
+> 该做法每次都会对软件包进行全量构建。虽耗时长，但操作简单，适用于大多数场景和用户。对于需要调试大型软件包、有增量构建需求的用户，可自行寻找其他方法进行增量构建，提高自身调试效率。
 
-3. **验证补丁**：退出 superenv，执行 `brew install -s -v <formula>` 验证构建是否通过。
-
-### 8.5 提交 PR
+### 8.6 提交 PR
 
 在本地验证通过并确认无误后，将 formula 和补丁一同提交至 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core) 仓库。

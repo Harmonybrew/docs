@@ -5,7 +5,9 @@
 - 非故障现象
   - [卸载 Homebrew 时，卸载脚本没有自动清理 zshrc](#not-clean-zshrc)
   - [通过后装软件包覆盖系统命令后，调用到的仍是系统命令](#failed-to-override-system-command)
+  - [无法在 CodeArts IDE 里面调用 Homebrew 安装的软件](#not-work-in-codearts)
 - 项目实现
+  - [为什么要卸载 GitNext 和 DevBox？](#why-delete-gitnext-devbox)
   - [Tier 1 和 Tier 2 平台的区别](#difference-between-tier1-and-tier2)
   - [我们对 Homebrew 做了哪些改动？](#what-changes-have-we-made)
   - [我们为什么能继承大部分上游的 formula？](#why-can-we-inherit-formula)
@@ -72,6 +74,53 @@
 - **解决方案（二选一）**：
   - **重置缓存**：在当前 Shell 中执行 `hash -r` 命令，强制清除并刷新命令哈希表。
   - **重启环境**：关闭当前的 HiShell 窗口并重新打开，使 Zsh 重新加载环境并扫描 PATH。
+
+<div id="not-work-in-codearts"></div>
+
+## 无法在 CodeArts IDE 里面调用 Homebrew 安装的软件
+
+- **现象描述**：
+
+  通过 `brew install` 安装了一个软件后，在 CodeArts IDE 的命令行面板里面执行相关的命令，依然会报错找不到命令。
+
+- **原因分析**：
+
+  这不是包管理器的 bug，也不是系统限制，而是两个 APP 使用的 shell 解释器不同导致的。
+
+  HiShell 使用的解释器是 `/usr/bin/zsh`，CodeArts IDE 使用的解释器是 `/bin/sh`（其底层实现是 mksh）。zsh 使用的配置文件是 `~/.zshrc`，mksh 使用的配置文件是 `~/.mkshrc`。因此你在 `~/.zshrc` 中编写的配置无法被 CodeArts IDE 的解释器识别。
+
+  由于本项目默认只支持系统自带的 HiShell 环境，并不承诺覆盖所有第三方应用，因此在安装指南中并未介绍这一知识。
+
+- **解决方案**：
+
+  如果你想在两个环境中都能使用 Homebrew 安装的命令，只需要往两个配置文件都写入配置即可：
+
+  ```sh
+  echo >> ~/.zshrc
+  echo 'eval "$(/storage/Users/currentUser/.harmonybrew/bin/brew shellenv)"' >> ~/.zshrc
+
+  echo >> ~/.mkshrc
+  echo 'eval "$(/storage/Users/currentUser/.harmonybrew/bin/brew shellenv)"' >> ~/.mkshrc
+  ```
+
+<div id="why-delete-gitnext-devbox"></div>
+
+## 为什么要卸载 GitNext 和 DevBox？
+
+Homebrew 深度依赖 git。如果它检测到你的机器上有已安装的 git，它会用已安装的 git 来支撑自身业务。如果你安装了 GitNext，Homebrew 就会优先使用 GitNext 提供的 git 来支撑自身业务。
+
+然而 GitNext 携带的 git 存在严重缺陷，无法支撑 Homebrew 正常工作：
+- 鸿蒙适配不完整
+- hnp 打包工具对软链接、硬链接进行强制解引用，导致部分功能出现报错
+- GitNext 开发者删除了 git 的部分文件
+
+<br>
+
+用户将其卸载后，Homebrew 检测到系统上没有可用的 git，就会自动下载一个自包含的 git 供自己使用，业务便可正常工作。
+
+> 这个自包含的 git 仅供 Homebrew 自己使用，不对外暴露。如果用户想使用 git，需要执行 `brew install git` 安装一个正常版本的 git。
+
+至于卸载 DevBox 的原因，并不是因为它影响 Homebrew 包管理器本身的运行，而是因为它与 Homebrew 提供的工具存在重合。如果两个工具混搭使用，可能会导致 Homebrew 里面提供的部分软件包以及 [特色软件](https://atomgit.com/Harmonybrew/docs/blob/main/zh-CN/user/featured-packages.md) 里面的方案无法正常工作。一旦出现此类问题，用户将难以定界问题来自 Homebrew 还是来自 DevBox。为避免产生不必要的争议和问题定位成本，本项目选择直接将其视为互斥软件。
 
 <div id="difference-between-tier1-and-tier2"></div>
 

@@ -77,7 +77,7 @@
       <td><a href="https://atomgit.com/Harmonybrew/.gitcode">.gitcode</a></td>
       <td>全局配置库</td>
       <td>新建</td>
-      <td>当前仅存储组织级 issue 模板，无其他内容。</td>
+      <td>当前仅存储组织级 Issue 模板，无其他内容。</td>
       <td>由 Harmonybrew 维护团队例行维护，暂不接纳 PR 贡献。</td>
     </tr>
     <tr>
@@ -153,6 +153,6 @@
 
 - **文档国际化**：目前 Harmonybrew/docs 仓库的文档缺乏英文版本，需要熟悉 Homebrew 的开发者协助翻译，以便与上游社区交流。
 - **软件包适配**：目前仍有大量上游 formula 尚未完成鸿蒙适配，未录入到我们的下游 Harmonybrew/homebrew-core 仓库中，需要技术能力强的开发者参与这方面的贡献。
-- **兼容性测试**：核心 tap 中的软件包并未经过充分测试，仅在录入时在流水线中执行了 `brew test` 冒烟测试，这些软件包在 OpenHarmony 设备上的兼容性是未知的，需要有人在不同设备上对其进行功能测试，将发掘出的问题以 issue 形式反馈至 Harmonybrew/homebrew-core 仓库。建议优先测试热门软件包，软件包热度可在 [下载数据统计](https://harmonybrew.atomgit.com/stats/) 页面获知。
+- **兼容性测试**：核心 tap 中的软件包并未经过充分测试，仅在录入时在流水线中执行了 `brew test` 冒烟测试，这些软件包在 OpenHarmony 设备上的兼容性是未知的，需要有人在不同设备上对其进行功能测试，将发掘出的问题以 Issue 形式反馈至 Harmonybrew/homebrew-core 仓库。建议优先测试热门软件包，软件包热度可在 [下载数据统计](https://harmonybrew.atomgit.com/stats/) 页面获知。
 - **AI 能力建设**：当前我们的 Formula 移植工作流程并未充分发挥业界主流 AI 能力，尚处于“各自为战”的碎片化状态：AI 能力的调用仍依赖开发者的个人经验在本地分散完成。我们希望能沉淀出可复用的 Prompt 资产、自动化 Agent 脚本或专用工具，构建统一的 AI 辅助工作流，帮助开发者更高效地输出 Formula 适配补丁。
-- **Issue 认领**：请关注本社区的 [issues](https://atomgit.com/org/Harmonybrew/issues)，尤其是归属于 Harmonybrew/homebrew-core 仓库的 issue，维护团队在这部分 issue 上几乎不会投入精力，主要依靠社区开发者互帮互助处理。
+- **Issue 认领**：请关注本社区的 [Issues](https://atomgit.com/org/Harmonybrew/issues)，尤其是归属于 Harmonybrew/homebrew-core 仓库的 Issue，维护团队在这部分 Issue 上几乎不会投入精力，主要依靠社区开发者互帮互助处理。
