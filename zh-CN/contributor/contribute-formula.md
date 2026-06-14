@@ -102,13 +102,34 @@ brew update
 
 ## 4 新增或修改 formula
 
-### 4.1 新增 formula
+### 4.1 formula 准入规则
+
+我们的核心 tap 准入规则与上游保持一致。无论是新增 formula 还是修改 formula，都需要确保最终提交的 formula 符合上游的 [Acceptable-Formulae](https://docs.brew.sh/Acceptable-Formulae) 标准。
+
+包括但不限于：
+- 必须是开源软件
+- 必须能从源码构建，禁止录入预构建的二进制文件
+- 源代码必须来自这个开源软件的官方，不能使用第三方社区维护的 fork 版本
+- 不能过于冷门
+- ......
+
+<br>
+
+在此基础上，还需要满足这些条件：
+- 必须通过 `brew style` 和 `brew audit` 检查。
+- 使用英文注释。
+
+<br>
+
+> **特例**：`ohos-sdk` 和 `rust` 是核心仓库中唯二的特例。这两套工具链目前无法在 OpenHarmony 平台上完成自举，因其作为生态基石的特殊地位，我们直接分发官方社区的构建版本。
+
+### 4.2 新增 formula
 
 **A. 搬运上游已有的 formula**
 
 如果开源软件在上游 [Homebrew/homebrew-core](https://github.com/Homebrew/homebrew-core) 中已存在，**必须直接搬运上游 formula，严禁从零手写**。
 
-这样做的目的是确保构建配置、依赖关系与上游保持一致，避免因打包差异导致连锁依赖失效。即便需要针对 OpenHarmony 环境做适配，也应在上游版本的基础上进行修改。若有特殊情况必须全量重写，请在 PR 中注明原因。
+这样做的目的是确保构建配置、依赖关系与上游保持一致，避免因打包差异导致连锁依赖失效。即便需要针对 OpenHarmony 环境做适配，也应在上游版本的基础上进行修改，并遵循最小化修改原则。若有特殊情况必须全量重写，请在 PR 中注明原因。
 
 以 `sevenzip` 为例，搬运流程如下：
 
@@ -133,21 +154,13 @@ brew test sevenzip
 
 **B. 手写全新的 formula**
 
-若上游仓库不存在该软件，则需手写全新的 formula，并遵循以下准则：
-
-- **准入规则**：必须符合上游的 [Acceptable-Formulae](https://docs.brew.sh/Acceptable-Formulae) 标准，例如必须是开源软件、必须能从源码构建（不能录入你自己构建好的二进制，这是为了防止投毒）、不能是 fork 版本、不能过于冷门等。
-- **代码规范**：必须通过 `brew style` 和 `brew audit` 检查。
-- **语言要求**：为便于后续与上游社区交流，请使用英文注释。
-
-<br>
+若上游仓库不存在该软件，则需手写全新的 formula。formula 需要符合上文列出的准入规则。
 
 如果你的软件包具备可移植性，建议先将其录入上游 [Homebrew/homebrew-core](https://github.com/Homebrew/homebrew-core)，再从上游搬运回来，而不是直接往下游仓库录入。如此一来，你的软件包不仅能覆盖更多操作系统，还能尽可能减少被我们拒收的可能性。因为从上游搬运过来的 formula 我们通常不会拒收。
 
 如果你的软件包因闭源、无法从源码构建等原因不满足核心仓库准入规则，请通过自定义 tap 的方式进行分发。参考：[通过自定义 tap 分发软件包](./custom-tap.md)。
 
-> **特例**：`ohos-sdk` 和 `rust` 是核心仓库中唯二的特例。这两套工具链目前无法在 OpenHarmony 平台上完成自举，因其作为生态基石的特殊地位，我们直接分发官方社区的构建版本。
-
-### 4.2 修改 formula
+### 4.3 修改 formula
 
 如果有修改 formula 的需求，请直接在 homebrew-core 仓库目录进行修改。
 
@@ -225,7 +238,9 @@ git push my-fork main:sevenzip
 
 去 AtomGit 网页上操作，从自己的个人仓往 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core) 提交 PR。
 
-PR 提交完成后，HarmonybrewBot 机器人会自动生成一个同名的“替代 PR”。
+PR 提交完成后，HarmonybrewBot 机器人会对这个 PR 进行门禁检查，并将检查结果发送至评论区。
+
+如果门禁检查通过，机器人会自动生成一个同名的“替代 PR”。如果门禁检查未通过，则贡献者需要根据检查结果进行整改。
 
 > **为什么要生成“替代 PR”？**
 > 因为 AtomGit 平台的能力相比于 GitHub 还是有所欠缺，并不支持设置 “Allow edits by maintainers”，而我们的业务非常依赖该特性（机器人在跑完流水线后需往 PR 中添加新的 commit）。在平台能力有限的情况下，只能通过这种妥协方式实现。
