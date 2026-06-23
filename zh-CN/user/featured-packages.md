@@ -80,7 +80,7 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
 
 ```sh
 # 安装编译工具链和环境伪装工具
-brew install devel-base uname-is-linux
+brew install -y devel-base uname-is-linux
 
 # HiShell 环境中，TMPDIR 环境变量的默认值是 /storage/Users/currentUser，这个目录承载在 HMDFS 上
 # 修改这个环境变量，将其指向一个非 HMDFS 的目录，避免因 HMDFS 文件系统缺陷导致编译失败
@@ -129,7 +129,7 @@ clang 驱动器在进行链接操作时，调用的是经过我们封装的 ld.l
 
 ```sh
 # 安装 rust 和 llvm-gcc-compat（ohos-sdk 会作为 llvm-gcc-compat 的级联依赖被自动引入）
-brew install rust llvm-gcc-compat
+brew install -y rust llvm-gcc-compat
 
 # 创建一个简单的 cargo 工程并将其编译成二进制
 cargo new hello_project
@@ -153,7 +153,7 @@ clang 驱动器在进行链接操作时，调用的是经过我们封装的 ld.l
 
 ```sh
 # 仅安装 rust 和 ohos-sdk，不安装 llvm-gcc-compat
-brew install rust ohos-sdk
+brew install -y rust ohos-sdk
 
 # 编写一个用户级的 config.toml
 mkdir -p ~/.cargo/
@@ -191,7 +191,7 @@ ohos-pip-autosign 便是为了解决这一痛点而生的工具，它能在 pip 
 
 ```sh
 # 安装 Python 运行时和自动签名工具
-brew install python ohos-pip-autosign
+brew install -y python ohos-pip-autosign
 
 # 激活 venv
 python3 -m venv .venv
@@ -226,7 +226,7 @@ python3 test.py
 
 ```sh
 # 安装 node 和开发工具（在此场景中 python 也属于开发工具，因为 node-gyp 依赖它）
-brew install node python devel-base
+brew install -y node python devel-base
 
 mkdir test-bufferutil
 cd test-bufferutil
@@ -275,7 +275,7 @@ node test.js
 
 ```sh
 # 安装 go（ohos-sdk 会作为级联依赖自动引入）
-brew install go
+brew install -y go
 
 mkdir go-example
 cd go-example
@@ -300,7 +300,7 @@ go build -o hello hello.go
 
 ```sh
 # 安装 go 和 llvm-gcc-compat（提供 cc 命令供 cgo 使用）
-brew install go llvm-gcc-compat
+brew install -y go llvm-gcc-compat
 
 mkdir cgo-example
 cd cgo-example

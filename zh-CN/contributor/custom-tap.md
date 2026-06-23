@@ -103,6 +103,9 @@ brew update
 
 # 添加自定义 tap
 brew tap harmonybrew/custom-tap-example https://atomgit.com/Harmonybrew/custom-tap-example.git
+
+# 将这个 tap 标记为受信任
+brew trust harmonybrew/custom-tap-example
 ```
 
 配置 SSH 密钥、Git 用户信息及仓库信息，确保具备提交权限：
@@ -159,6 +162,9 @@ brew update
 
 # 添加自定义 tap
 brew tap harmonybrew/custom-tap-example https://atomgit.com/Harmonybrew/custom-tap-example.git
+
+# 将这个 tap 标记为受信任
+brew trust harmonybrew/custom-tap-example
 
 # 安装自定义 tap 中的软件包
 brew install busybox
