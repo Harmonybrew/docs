@@ -87,14 +87,14 @@ git clone --depth 1 $MIRROR/git/homebrew-core.git /tmp/core-test && rm -rf /tmp/
 
 ## 5 完整 nginx 配置
 
-### 5.1 直连版配置（带缓存）
+### 5.1 直连版配置
 
 保存到 `/etc/nginx/conf.d/harmonybrew-mirror.conf`：
 
 ```nginx
 # Harmonybrew 镜像站 - 直连版（带缓存）
 # 部署: sudo cp 此文件 /etc/nginx/conf.d/ && sudo nginx -t && sudo nginx -s reload
-# 缓存策略: bottle 长期缓存（30 天）, api/install.sh/brew.tar.gz 短 TTL（10 分钟）, git 不缓存
+# 缓存策略: bottle 超长 TTL（365 天, 永不覆盖）, api/install.sh/brew.tar.gz 短 TTL（10 分钟）, git 不缓存
 
 # ===== 缓存目录（放 conf.d 会被 include 进 http{} 块） =====
 proxy_cache_path /var/cache/nginx/harmonybrew
@@ -122,8 +122,7 @@ server {
     proxy_cache hb_cache;
     proxy_cache_lock on;              # 并发同文件只回源一次, 防击穿
     proxy_cache_revalidate on;        # 过期后用 If-Modified-Since 轻量回源
-    proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
-    proxy_cache_background_update on; # 过期时先返旧缓存, 后台刷新
+    proxy_cache_use_stale error timeout http_500 http_502 http_503 http_504;  # 仅上游故障时返旧兜底, 不在过期时返旧
     add_header X-Cache-Status $upstream_cache_status always;
 
     # ===== git brew 仓: 不缓存（git smart http 动态协议） =====
@@ -184,7 +183,7 @@ server {
         proxy_read_timeout 120s;
     }
 
-    # ===== Bottle: 长期缓存（30 天）, 永不覆盖只增新 =====
+    # ===== Bottle: 永不覆盖, 超长 TTL（365 天）, 过期概念本就无意义 =====
     location /bottles/ {
         proxy_pass https://hb_harmonybrew/bottles/;
         proxy_ssl_server_name on;
@@ -197,8 +196,8 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Connection "";
         proxy_buffering on;
-        proxy_cache_valid 200 30d;
-        proxy_cache_valid 206 30d;
+        proxy_cache_valid 200 365d;
+        proxy_cache_valid 206 365d;
         proxy_read_timeout 600s;
         proxy_send_timeout 600s;
     }
@@ -270,31 +269,29 @@ server {
 与 <a href="https://atomgit.com/Harmonybrew">atomgit.com/Harmonybrew</a>。</p>
 <h2>使用方法</h2>
 <h3>全新安装 Harmonybrew</h3>
-<pre><code>export MIRROR=http://YOUR_MIRROR
-export HOMEBREW_API_DOMAIN=$MIRROR/api
-export HOMEBREW_BOTTLE_DOMAIN=$MIRROR/bottles
-export HOMEBREW_BREW_GIT_REMOTE=$MIRROR/git/brew.git
-export HOMEBREW_CORE_GIT_REMOTE=$MIRROR/git/homebrew-core.git
-zsh -c "$(curl -fsSL $MIRROR/install.sh)"</code></pre>
-<p>安装完成后，注意遵循安装脚本的提示，将相关变量都写进 ~/.zshrc。</p>
+<pre><code>export HOMEBREW_API_DOMAIN=http://YOUR_MIRROR/api
+export HOMEBREW_BOTTLE_DOMAIN=http://YOUR_MIRROR/bottles
+export HOMEBREW_BREW_GIT_REMOTE=http://YOUR_MIRROR/git/brew.git
+export HOMEBREW_CORE_GIT_REMOTE=http://YOUR_MIRROR/git/homebrew-core.git
+zsh -c "$(curl -fsSL http://YOUR_MIRROR/install.sh)"</code></pre>
+<p>安装完成后，将上述 export 操作写入 ~/.zshrc。</p>
 <h3>已安装 Harmonybrew，换成镜像源</h3>
-<p>将以下环境变量写进 ~/.zshrc，然后 source ~/.zshrc（或新开终端）使其生效，再 brew update。</p>
-<pre><code>export MIRROR=http://YOUR_MIRROR
-export HOMEBREW_API_DOMAIN=$MIRROR/api
-export HOMEBREW_BOTTLE_DOMAIN=$MIRROR/bottles
-export HOMEBREW_BREW_GIT_REMOTE=$MIRROR/git/brew.git
-export HOMEBREW_CORE_GIT_REMOTE=$MIRROR/git/homebrew-core.git</code></pre>
+<p>将以下 export 操作写进 ~/.zshrc，然后 source ~/.zshrc（或新开终端）使其生效，再 brew update。</p>
+<pre><code>export HOMEBREW_API_DOMAIN=http://YOUR_MIRROR/api
+export HOMEBREW_BOTTLE_DOMAIN=http://YOUR_MIRROR/bottles
+export HOMEBREW_BREW_GIT_REMOTE=http://YOUR_MIRROR/git/brew.git
+export HOMEBREW_CORE_GIT_REMOTE=http://YOUR_MIRROR/git/homebrew-core.git</code></pre>
 </body>
 </html>
 ```
 
-### 5.3 缓存策略（核心价值）
+### 5.3 缓存策略
 
-镜像站的意义在于缓存——让多个内网用户共享一份回源数据，避免争抢互联网出口。本方案按文件更新特征分两类缓存：
+缓存让多用户共享一份回源数据，同一文件只需向上游取一次，后续命中本地即可返回。本方案按文件更新特征分两类缓存：
 
 | 路径 | 更新特征 | 缓存策略 | TTL |
 |---|---|---|---|
-| `/bottles/` | **永不覆盖**，只发新文件 | 长期缓存，命中即返回本地 | **30 天** |
+| `/bottles/` | **永不覆盖**，只发新文件 | 超长 TTL，命中即返回本地 | **365 天** |
 | `/api/*.json` | 频繁更新（formula/cask 索引） | 短 TTL，过期后回源覆盖 | **10 分钟** |
 | `/install.sh`、`/brew/brew.tar.gz` | 偶尔更新 | 短 TTL | 10 分钟 |
 | `/git/*` | 动态协议（git smart http） | **不缓存**，透传 | — |
@@ -305,16 +302,15 @@ export HOMEBREW_CORE_GIT_REMOTE=$MIRROR/git/homebrew-core.git</code></pre>
 proxy_cache_path /var/cache/nginx/harmonybrew levels=1:2 keys_zone=hb_cache:10m max_size=50g inactive=30d use_temp_path=off;
 proxy_cache_lock on;            # 并发同文件只回源一次, 防击穿
 proxy_cache_revalidate on;      # 过期后用 If-Modified-Since 轻量回源, 未变返 304 不重传
-proxy_cache_use_stale error timeout updating http_5xx;  # 回源失败时返旧缓存, 保可用
-proxy_cache_background_update on;  # 过期时先返旧缓存, 后台刷新（用户无感）
-proxy_cache_valid 200 30d;      # bottle: 30 天长期
+proxy_cache_use_stale error timeout http_5xx;  # 仅上游故障时返旧兜底, 保可用; 不在过期时返旧
+proxy_cache_valid 200 365d;     # bottle: 永不覆盖, 超长 TTL
 proxy_cache_valid 200 10m;      # api/install.sh/brew.tar.gz: 10 分钟
-add_header X-Cache-Status $upstream_cache_status always;  # 观察命中: MISS/HIT/EXPIRED/UPDATING/STALE
+add_header X-Cache-Status $upstream_cache_status always;  # 观察命中: MISS/HIT/EXPIRED/STALE
 ```
 
-**如何确认缓存生效**：响应头 `X-Cache-Status` 第一次是 `MISS`（回源），之后是 `HIT`（命中本地）。过期后变 `UPDATING`（返旧）或 `EXPIRED`（回源覆盖）。
+**如何确认缓存生效**：响应头 `X-Cache-Status` 第一次是 `MISS`（回源），之后是 `HIT`（命中本地）。过期后变 `EXPIRED`（回源覆盖）。`STALE` 仅在回源失败（上游 5xx/超时）时出现，返旧兜底保可用。
 
-**容量规划**：`max_size=50g` 是缓存上限（所有缓存文件加起来的体积上限，超出后 nginx 自动按 LRU 淘汰最旧缓存项）。bottle 单个可达数百 MB，50g 可覆盖数十到上百个常用 bottle，缓存命中率有保障；缓存服务器磁盘通常宽裕，按实际磁盘空间与服务用户规模再调。`keys_zone=hb_cache:10m` 内存索引（约 8 万个 key）。
+**容量规划**：`max_size=50g` 是缓存上限（所有缓存文件加起来的体积上限，超出后 nginx 自动按 LRU 淘汰最旧缓存项）。缓存服务器磁盘通常宽裕，按实际磁盘空间与服务用户规模再调。
 
 **清理缓存**（如需强制刷新某文件）：
 
@@ -326,19 +322,16 @@ sudo rm -rf /var/cache/nginx/harmonybrew/* && sudo nginx -s reload
 
 ## 6 客户端使用
 
-### 6.1 新安装（走镜像）
+### 6.1 新安装
 
 **必须设置全部四个环境变量**（两个 DOMAIN + 两个 GIT_REMOTE），否则 brew 运行时下载 bottle 和读 API 会直连上游，绕过镜像。这是所有 Homebrew 镜像源的通用要求，这几个变量要全程存在。
 
 ```bash
-export MIRROR=http://<镜像服务器IP>
-export HOMEBREW_API_DOMAIN=$MIRROR/api
-export HOMEBREW_BOTTLE_DOMAIN=$MIRROR/bottles
-export HOMEBREW_BREW_GIT_REMOTE=$MIRROR/git/brew.git
-export HOMEBREW_CORE_GIT_REMOTE=$MIRROR/git/homebrew-core.git
-
-# 鸿蒙容器需先装 zsh（见官方安装指南）
-zsh -c "$(curl -fsSL $MIRROR/install.sh)"
+export HOMEBREW_API_DOMAIN=http://<镜像服务器IP或域名>/api
+export HOMEBREW_BOTTLE_DOMAIN=http://<镜像服务器IP或域名>/bottles
+export HOMEBREW_BREW_GIT_REMOTE=http://<镜像服务器IP或域名>/git/brew.git
+export HOMEBREW_CORE_GIT_REMOTE=http://<镜像服务器IP或域名>/git/homebrew-core.git
+zsh -c "$(curl -fsSL http://<镜像服务器IP或域名>/install.sh)"
 ```
 
 安装完成后，将上述 `export` 写入 `~/.mkshrc`（容器 mksh）或 `~/.zshrc`（PC zsh）持久化，确保后续每次 `brew` 调用都走镜像。
@@ -348,12 +341,10 @@ zsh -c "$(curl -fsSL $MIRROR/install.sh)"
 同样需要设全四个环境变量：
 
 ```bash
-eval "$(/storage/Users/currentUser/.harmonybrew/bin/brew shellenv)"
-export MIRROR=http://<镜像服务器IP>
-export HOMEBREW_API_DOMAIN=$MIRROR/api
-export HOMEBREW_BOTTLE_DOMAIN=$MIRROR/bottles
-export HOMEBREW_BREW_GIT_REMOTE=$MIRROR/git/brew.git
-export HOMEBREW_CORE_GIT_REMOTE=$MIRROR/git/homebrew-core.git
+export HOMEBREW_API_DOMAIN=http://<镜像服务器IP或域名>/api
+export HOMEBREW_BOTTLE_DOMAIN=http://<镜像服务器IP或域名>/bottles
+export HOMEBREW_BREW_GIT_REMOTE=http://<镜像服务器IP或域名>/git/brew.git
+export HOMEBREW_CORE_GIT_REMOTE=http://<镜像服务器IP或域名>/git/homebrew-core.git
 brew update
 ```
 
@@ -367,11 +358,9 @@ sudo tail -f /var/log/nginx/harmonybrew-mirror.access.log   # install/bottle/api
 ```
 
 
-## 7 企业内网部署（经出口代理出网）
+## 7 企业内网部署
 
-企业内网服务器无法直连互联网，需经出口代理（常带 `username:password` 认证）出网。本方案在 nginx 与上游之间插入一个 **Python 正向代理脚本** `forwardproxy.py`，由它统一携带企业代理认证出网，**终端用户完全无感**——照常指向 `http://内网镜像IP`，无需在客户端设任何代理变量。
-
-> 用 Python 脚本而非 tinyproxy 的原因：零依赖（仅 Python 3 标准库，任何发行版都有）、跨平台、配置直观（命令行参数传认证）、易嵌入易审计。
+企业内网服务器无法直连互联网，需经出口代理（常带 `username:password` 认证）出网。本方案在 nginx 与上游之间插入一个 **Python 正向代理脚本** `forwardproxy.py`，由它统一携带企业代理认证出网，**终端用户完全无感**——照常指向 `http://镜像服务器IP或域名`，无需在客户端设任何代理变量。
 
 ### 7.1 拓扑
 
@@ -406,7 +395,7 @@ sudo tail -f /var/log/nginx/harmonybrew-mirror.access.log   # install/bottle/api
 #   - 并发处理（多线程）
 #
 # 用法:
-#   python3 forwardproxy.py                          # 监听 0.0.0.0:8888, 直连出网
+#   python3 forwardproxy.py                         # 监听 0.0.0.0:8888, 直连出网
 #   python3 forwardproxy.py -p 8888                 # 指定端口
 #   python3 forwardproxy.py -u http://user:pass@proxy.example.com:8080   # 挂企业代理
 #   python3 forwardproxy.py -b 127.0.0.1            # 仅本地（推荐，配合 nginx）
@@ -664,27 +653,62 @@ if __name__ == "__main__":
 ### 7.3 部署步骤
 
 ```bash
-# 1. 放脚本到固定位置
+# 1. 建目录（静态说明页 + 缓存目录）
+sudo mkdir -p /var/www/harmonybrew-mirror /var/cache/nginx/harmonybrew
+sudo chown -R www-data:www-data /var/cache/nginx 2>/dev/null || sudo chown -R nginx:nginx /var/cache/nginx
+
+# 2. 删 nginx 默认站点避免 80 端口冲突
+sudo rm -f /etc/nginx/sites-enabled/default
+
+# 3. 放脚本到固定位置
 sudo mkdir -p /opt/harmonybrew-mirror
 sudo cp forwardproxy.py /opt/harmonybrew-mirror/
 sudo chmod +x /opt/harmonybrew-mirror/forwardproxy.py
 
-# 2. 写企业版 nginx 配置到 /etc/nginx/conf.d/harmonybrew-mirror.conf（见 §7.4）
-# 3. 写根说明页到 /var/www/harmonybrew-mirror/index.html（同 §5.2）
+# 4. 写企业版 nginx 配置到 /etc/nginx/conf.d/harmonybrew-mirror.conf（见 §7.4）
+#    写根说明页到 /var/www/harmonybrew-mirror/index.html（同 §5.2）
 
-# 4. 启动脚本（把 URL 换成你的企业代理）
-sudo nohup python3 /opt/harmonybrew-mirror/forwardproxy.py \
-    -b 127.0.0.1 -p 8888 \
-    -u http://username:password@proxy.example.com:8080 \
-    > /var/log/forwardproxy.log 2>&1 &
+# 5. 写 systemd unit（把 -u 参数换成你的企业代理地址，无需认证就删掉末尾的 -u http://... 参数）
+sudo tee /etc/systemd/system/forwardproxy.service > /dev/null <<'EOF'
+[Unit]
+Description=Harmonybrew Mirror Forward Proxy
+After=network.target
 
-# 5. reload nginx
+[Service]
+Type=simple
+ExecStart=/usr/bin/python3 /opt/harmonybrew-mirror/forwardproxy.py -b 127.0.0.1 -p 8888 -u http://username:password@proxy.example.com:8080
+Restart=always
+RestartSec=3
+StandardOutput=append:/var/log/forwardproxy.log
+StandardError=append:/var/log/forwardproxy.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# 6. 启用脚本（开机自启、崩溃自恢复）
+sudo systemctl daemon-reload
+sudo systemctl enable --now forwardproxy
+sudo systemctl status forwardproxy    # 看运行状态，应 active (running)
+ss -tlnp | grep 8888                  # 应见 LISTEN，否则按 §7.6 排查
+
+# 7. reload nginx
 sudo nginx -t && sudo nginx -s reload
+
+# 8. 自检（应全部 200，/bottles/ 为 404 属正常）
+MIRROR=http://127.0.0.1
+curl -s -o /dev/null -w "%{http_code}\n" $MIRROR/health                                    # 200
+curl -s -o /dev/null -w "%{http_code}\n" $MIRROR/install.sh                                # 200
+curl -sI $MIRROR/brew/brew.tar.gz | head -1                                                # 200
+curl -sI $MIRROR/api/formula.jws.json | head -1                                            # 200
+git clone --depth 1 $MIRROR/git/homebrew-core.git /tmp/core-test && rm -rf /tmp/core-test  # 成功
 ```
+
+> 步骤 4 的 unit 文件参数说明见 §7.5。
 
 ### 7.4 企业版 nginx 配置
 
-与直连版（§5.1）的唯一区别：所有 `proxy_pass` 从 `https://上游域名` 改为 `http://本地脚本`，其余透传规则（UA/Cookie/Host/Range）和缓存策略**完全一致**。保存到 `/etc/nginx/conf.d/harmonybrew-mirror.conf`（覆盖直连版）：
+与直连版（§5.1）的唯一区别：所有 `proxy_pass` 从 `https://上游域名` 改为 `http://本地脚本`，其余透传规则（UA/Cookie/Host/Range）和缓存策略**完全一致**。保存到 `/etc/nginx/conf.d/harmonybrew-mirror.conf`：
 
 ```nginx
 # Harmonybrew 镜像站 - 企业内网版（带缓存）
@@ -714,8 +738,7 @@ server {
     proxy_cache hb_cache;
     proxy_cache_lock on;
     proxy_cache_revalidate on;
-    proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
-    proxy_cache_background_update on;
+    proxy_cache_use_stale error timeout http_500 http_502 http_503 http_504;
     add_header X-Cache-Status $upstream_cache_status always;
 
     # ===== git brew 仓: 不缓存 =====
@@ -770,7 +793,7 @@ server {
         proxy_read_timeout 120s;
     }
 
-    # ===== Bottle: 长期缓存（30 天） =====
+    # ===== Bottle: 永不覆盖, 超长 TTL（365 天） =====
     location /bottles/ {
         proxy_pass http://hb_local_proxy/bottles/;
         proxy_set_header Host harmonybrew.atomgit.com;
@@ -781,8 +804,8 @@ server {
         proxy_http_version 1.1;
         proxy_set_header Connection "";
         proxy_buffering on;
-        proxy_cache_valid 200 30d;
-        proxy_cache_valid 206 30d;
+        proxy_cache_valid 200 365d;
+        proxy_cache_valid 206 365d;
         proxy_read_timeout 600s;
         proxy_send_timeout 600s;
     }
@@ -834,38 +857,20 @@ server {
 }
 ```
 
-### 7.5 用 systemd 托管脚本（推荐）
+### 7.5 systemd unit 参数说明
 
-保存到 `/etc/systemd/system/forwardproxy.service`，让脚本开机自启、崩溃自拉：
+§7.3 步骤 4 写入的 unit 文件各字段含义：
 
-```ini
-[Unit]
-Description=Harmonybrew Mirror Forward Proxy
-After=network.target
+| 字段 | 说明 |
+|---|---|
+| `ExecStart` | 脚本启动命令。`-u` 指企业上游代理（`http://user:pass@host:port`），无需认证就删掉末尾的 `-u http://...` 参数；`-b 127.0.0.1` 仅本地监听（配合 nginx，勿改）；`-p 8888` 监听端口，与 §7.4 nginx 的 `upstream hb_local_proxy` 端口须一致 |
+| `Restart=always` + `RestartSec=3` | 崩溃后 3 秒自动恢复 |
+| `StandardOutput`/`StandardError` | 日志统一写 `/var/log/forwardproxy.log`，排查看此文件 |
+| `WantedBy=multi-user.target` | 开机自启 |
 
-[Service]
-Type=simple
-ExecStart=/usr/bin/python3 /opt/harmonybrew-mirror/forwardproxy.py -b 127.0.0.1 -p 8888 -u http://username:password@proxy.example.com:8080
-Restart=always
-RestartSec=3
-StandardOutput=append:/var/log/forwardproxy.log
-StandardError=append:/var/log/forwardproxy.log
+改完 unit 后需 `sudo systemctl daemon-reload && sudo systemctl restart forwardproxy` 生效。
 
-[Install]
-WantedBy=multi-user.target
-```
-
-> 把 `ExecStart` 里的 `-u` 参数换成你的企业代理地址。无需认证就删掉 `-u` 整行。
-
-启用：
-
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now forwardproxy
-sudo systemctl status forwardproxy    # 看运行状态
-```
-
-### 7.6 故障排查（企业版）
+### 7.6 故障排查
 
 | 现象 | 排查 |
 |---|---|
@@ -875,18 +880,19 @@ sudo systemctl status forwardproxy    # 看运行状态
 | git clone 卡住或超时 | 企业代理对长连接/git 协议有限流；脚本已设 60s 隧道超时，可改源码 `select(..., 60)` 调大 |
 | API/bottle 慢 | 企业代理带宽小；考虑调大 `proxy_cache_path` 的 `max_size` 延长缓存命中 |
 
-### 7.7 客户端使用（企业内网版，无感）
+### 7.7 客户端使用
 
 终端用户**无需设置任何 HTTP_PROXY/HTTPS_PROXY**，只指向镜像——企业代理认证完全在镜像服务器侧（forwardproxy.py）透明完成：
 
 ```bash
-export MIRROR=http://<镜像服务器内网IP>
-export HOMEBREW_API_DOMAIN=$MIRROR/api
-export HOMEBREW_BOTTLE_DOMAIN=$MIRROR/bottles
-export HOMEBREW_BREW_GIT_REMOTE=$MIRROR/git/brew.git
-export HOMEBREW_CORE_GIT_REMOTE=$MIRROR/git/homebrew-core.git
-zsh -c "$(curl -fsSL $MIRROR/install.sh)"
+export HOMEBREW_API_DOMAIN=http://<镜像服务器IP或域名>/api
+export HOMEBREW_BOTTLE_DOMAIN=http://<镜像服务器IP或域名>/bottles
+export HOMEBREW_BREW_GIT_REMOTE=http://<镜像服务器IP或域名>/git/brew.git
+export HOMEBREW_CORE_GIT_REMOTE=http://<镜像服务器IP或域名>/git/homebrew-core.git
+zsh -c "$(curl -fsSL http://<镜像服务器IP或域名>/install.sh)"
 ```
+
+安装完成后，将上述 `export` 写入 `~/.mkshrc`（容器 mksh）或 `~/.zshrc`（PC zsh）持久化，确保后续每次 `brew` 调用都走镜像。
 
 
 ## 8 常见问题
@@ -902,6 +908,7 @@ zsh -c "$(curl -fsSL $MIRROR/install.sh)"
 - **改 TTL**：编辑对应 location 的 `proxy_cache_valid`，如 API 想更实时改 `200 5m`，bottle 想更久改 `200 90d`
 - **改容量**：`proxy_cache_path` 的 `max_size`（默认 50g），按磁盘空间调
 - **改缓存目录**：`proxy_cache_path` 第一个参数，建议放独立磁盘/SSD
+- **内存索引**：`keys_zone=hb_cache:10m` 是缓存键的内存索引，约 8 万个 key 的容量，对绝大多数镜像规模绰绰有余，通常无需调整
 - **确认命中**：看响应头 `X-Cache-Status`，或 `curl -I` 观察是否 `HIT`
 - **强制刷新某文件**：删 `rm -rf /var/cache/nginx/harmonybrew/*` 后 reload
 
@@ -913,13 +920,14 @@ zsh -c "$(curl -fsSL $MIRROR/install.sh)"
 ## 9 卸载
 
 ```bash
-# 直连版
+# 通用清理（直连版/企业版都做）
 sudo rm /etc/nginx/conf.d/harmonybrew-mirror.conf
 sudo rm -rf /var/www/harmonybrew-mirror /var/cache/nginx/harmonybrew
 sudo nginx -t && sudo nginx -s reload
 
 # 企业版额外清理
 sudo systemctl stop forwardproxy
+sudo systemctl disable forwardproxy
 sudo rm /etc/systemd/system/forwardproxy.service
 sudo systemctl daemon-reload
 sudo rm -rf /opt/harmonybrew-mirror
@@ -935,6 +943,7 @@ sudo rm -rf /opt/harmonybrew-mirror
 | bottle/`brew.tar.gz` 透传 `Range` + buffering on | 支持断点续传，配合 proxy_cache 写入缓存 |
 | 根路径返回静态说明页 | 满足 `install.sh` 开头对镜像根地址的 HEAD 探活（HTTP 通即放行） |
 | `gzip off` | bottle 是已压缩 tar.gz，再 gzip 与 Range 冲突 |
-| `proxy_cache` 分层 TTL | bottle 永不覆盖→长期缓存（30d）；API/install.sh/brew.tar.gz 会更新→短 TTL（10m）；git 动态→不缓存 |
-| `proxy_cache_lock` + `proxy_cache_background_update` | 并发防击穿+过期时先返旧缓存后台刷新，用户无感 |
+| `proxy_cache` 分层 TTL | bottle 永不覆盖→超长 TTL（365d）；API/install.sh/brew.tar.gz 会更新→短 TTL（10m）；git 动态→不缓存 |
+| `proxy_cache_lock` + `proxy_cache_revalidate` | 并发防击穿+过期后用 If-Modified-Since 轻量回源（未变返 304 不重传） |
+| `proxy_cache_use_stale error timeout http_5xx` | 仅上游故障时返旧兜底保可用；不在过期时返旧，过期即回源取新（短 TTL 资源需及时刷新） |
 | 企业版用 forwardproxy.py 而非重编译 nginx | 仅 Python 3 标准库零依赖，`-u http://user:pass@host:port` 命令行传认证 |
