@@ -182,7 +182,7 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
      - 名称：随意
        - 镜像地址：根据你注册的 SWR 组织信息构造出 ci-runner 镜像的下载地址。假设你的组织名字为 brewharmony、Region 在北京四，那你的镜像下载地址就是这样：`swr.cn-north-4.myhuaweicloud.com/brewharmony/ci-runner:latest`
        - 命令：`python3 src/auto_bottle.py`
-2. 以同样的操作，将 `auto-merge`、`auto-bump`、`auto-static`、`auto-stats` 这几个任务也都创建出来。这些任务除了脚本名字不一样以外其他配置完全相同。
+2. 以同样的操作，将 `auto-merge`、`auto-bump`、`auto-static`、`auto-stats`、`auto-clear` 这几个任务也都创建出来。这些任务除了脚本名字不一样以外其他配置完全相同。
 3. 进入“编译构建”界面，新建一个任务
    - 名称：`auto-image 任务`
    - 代码源：来自流水线
@@ -272,6 +272,18 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
   </tr>
 
   <tr>
+    <td>auto-clear 任务</td>
+    <td>
+      <ul>
+        <li>HUAWEICLOUD_SDK_AK</li>
+        <li>HUAWEICLOUD_SDK_SK</li>
+        <li>OBS_BUCKET</li>
+        <li>OBS_REGION</li>
+      </ul>
+    </td>
+  </tr>
+
+  <tr>
     <td>auto-image 任务</td>
     <td>
       <ul>
@@ -290,7 +302,7 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
 
 1. 在 CodeArts 服务的工作台，找到左侧菜单的 “持续交付”-“流水线”，点进去，创建一条流水线。
    - 名称：auto-bottle
-   - 流水线源：AtomGit
+   - 流水线源：GitCode
    - 服务扩展点：harmonybrew
    - 代码仓：ci（指向你 fork 的 ci 仓库）
    - 默认分支：main
@@ -301,7 +313,7 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
    - 任务：auto-bottle 任务
    - 仓库：ci
 
-按照相同的方法，将 `auto-merge`、`auto-bump`、`auto-static`、`auto-stats`、`auto-image` 这几条流水线创建出来。他们之间的区别只有触发设置不同，前面的创建步骤是一样的。
+按照相同的方法，将 `auto-merge`、`auto-bump`、`auto-static`、`auto-stats`、`auto-clear`、`auto-image` 这几条流水线创建出来。他们之间的区别只有触发设置不同，前面的创建步骤是一样的。
 
 流水线创建完成后，依次修改各个流水线的触发设置：
 
@@ -354,6 +366,15 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
     <td>
       <ul>
         <li>定时任务， corn 表达式是 `0 0 0 * * ?`（每天 0:00 执行一次）</li>
+      </ul>
+    </td>
+  </tr>
+
+  <tr>
+    <td>auto-clear</td>
+    <td>
+      <ul>
+        <li>定时任务， corn 表达式是 `0 0 6 * * ?`（每天 6:00 执行一次）</li>
       </ul>
     </td>
   </tr>
