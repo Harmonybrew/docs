@@ -140,7 +140,7 @@ ln -s ../Formula/s/sevenzip.rb Aliases/7-zip
 ln -s ../Formula/s/sevenzip.rb Aliases/7zip
 
 # 从源码安装（触发本地实时构建）
-brew install -s -v --include-test sevenzip
+brew install -y -s -v --include-test sevenzip
 
 # 执行冒烟测试，验证功能
 brew test sevenzip
@@ -172,7 +172,7 @@ cd $(brew --repo harmonybrew/core)
 vim Formula/s/sevenzip.rb
 
 # 从源码安装（触发本地实时构建）
-brew install -s -v --include-test sevenzip
+brew install -y -s -v --include-test sevenzip
 
 # 执行冒烟测试，验证功能
 brew test sevenzip
@@ -350,7 +350,7 @@ diff -ruN a b > 0001-add-ohos-support.patch
 
 ### 8.5 验证补丁
 
-执行 `brew install -s -v --include-test <formula>`、`brew test <formula>` 验证构建和测试是否通过。如果不通过，需要重新制作补丁、重新验证，直至验证通过。
+执行 `brew install -y -s -v --include-test <formula>`、`brew test <formula>` 验证构建和测试是否通过。如果不通过，需要重新制作补丁、重新验证，直至验证通过。
 
 > 该做法每次都会对软件包进行全量构建。虽耗时长，但操作简单，适用于大多数场景和用户。对于需要调试大型软件包、有增量构建需求的用户，可自行寻找其他方法进行增量构建，提高自身调试效率。
 

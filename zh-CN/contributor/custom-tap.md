@@ -128,7 +128,7 @@ cd -
 
 ```sh
 # 以 build-bottle 模式从源码安装（实际流程为下载预构建包）
-brew install -v --build-bottle busybox
+brew install -y -v --build-bottle busybox
 
 # 生成 bottle 和软件包元数据
 # --root_url 需指向发行版的下载路径，以便 Homebrew 正确拼接 bottle 地址
@@ -167,7 +167,7 @@ brew tap harmonybrew/custom-tap-example https://atomgit.com/Harmonybrew/custom-t
 brew trust harmonybrew/custom-tap-example
 
 # 安装自定义 tap 中的软件包
-brew install busybox
+brew install -y busybox
 
 # 执行软件包里面的命令，验证它是否正常工作
 busybox
