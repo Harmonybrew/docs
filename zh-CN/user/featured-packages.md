@@ -65,6 +65,16 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
         README 文档。
       </td>
     </tr>
+    <tr>
+      <td>musl-compat</td>
+      <td>
+        为 OpenHarmony 补充 musl libc 缺失符号的兼容垫片库。当前主要供
+        <code>python@3.14</code>、<code>python@3.13</code>
+        等 formula 使用。详细用法请看
+        <a href="https://atomgit.com/Harmonybrew/musl-compat">源码仓</a> 里面的
+        README 文档。
+      </td>
+    </tr>
   </tbody>
 </table>
 

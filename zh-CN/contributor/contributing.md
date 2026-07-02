@@ -111,6 +111,15 @@
     </tr>
     <tr>
       <td>
+        <a href="https://atomgit.com/Harmonybrew/musl-compat">musl-compat</a>
+      </td>
+      <td>用于补充 musl 符号的兼容垫片库</td>
+      <td>新建</td>
+      <td>本项目维护者开发的实用工具，旨在为用户提供便利。</td>
+      <td>使用中文提交信息、中文注释。</td>
+    </tr>
+    <tr>
+      <td>
         <a href="https://atomgit.com/Harmonybrew/custom-tap-example">custom-tap-example</a>
       </td>
       <td>自定义 tap 样例</td>
