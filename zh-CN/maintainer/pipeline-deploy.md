@@ -415,7 +415,8 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
 
        # 其他路径返回 403
        location / {
-           return 403;
+           default_type text/plain;
+           return 403 "Access Denied.";
        }
    }
    ```
