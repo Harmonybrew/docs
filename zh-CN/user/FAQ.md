@@ -7,6 +7,7 @@
   - [通过后装软件包覆盖系统命令后，调用到的仍是系统命令](#failed-to-override-system-command)
   - [无法在 CodeArts IDE 的命令行面板中调用 Homebrew 安装的软件](#not-work-in-codearts)
   - [第三方鸿蒙应用识别不到 Homebrew 安装的软件](#not-work-in-third-party-app)
+  - [无法在 PC 上使用开发者命令](#can-not-use-developer-commands-in-pc)
 - 项目实现
   - [为什么要卸载 GitNext 和 DevBox？](#why-delete-gitnext-devbox)
   - [Tier 1 和 Tier 2 平台的区别](#difference-between-tier1-and-tier2)
@@ -125,6 +126,35 @@
   在其他 OS 上，这种 GUI 应用的 PATH 变量问题，一般是由桌面系统来提供解决方案。例如，在 Windows 系统上，系统的设置菜单里面有系统级环境变量和用户级环境变量的设置项；在 Linux 系统上，GNOME 和 KDE 等桌面系统也提供了各自的解决方案。
 
   当前鸿蒙 PC 未提供向 GUI 应用传递环境变量的解决方案，我们作为应用开发者对此也无能为力。这部分需求请大家向厂商求助，只有用户呼声够大，厂商才会重视。
+
+<div id="can-not-use-developer-commands-in-pc"></div>
+
+## 无法在 PC 上使用开发者命令
+
+- **现象描述**：
+
+  用户在鸿蒙 PC 上使用开发者命令（例如 `brew test`）时，会遇到这样的报错：`You have to install development tools first.`。
+
+- **原因分析**：
+
+  由于 Homebrew 的环境变量过滤机制，我们难以在 PC 上使用开发者命令，详情可查看 [这个 issue](https://atomgit.com/Harmonybrew/brew/issues/3)。
+
+  Homebrew 本身设计便是如此，并非是我们鸿蒙适配做得不完整。
+
+- **解决方案**：
+
+  为了解决这个问题，我们添加了一个 `HOMEBREW_EXTRA_PATH` 环境变量，详见 [这个 PR](https://atomgit.com/Harmonybrew/brew/pull/35)。
+
+  只需要设置这个环境变量，引入附加的工具链路径，Homebrew 便可正常构建出 Ruby 原生模块，使开发者命令成功运行。
+
+  用法示例：
+
+  ```sh
+  brew update
+  brew install make llvm-gcc-compat gzip
+  export HOMEBREW_EXTRA_PATH="$(brew --prefix)/opt/make/bin:$(brew --prefix)/opt/llvm-gcc-compat/bin"
+  brew test gzip
+  ```
 
 <div id="why-delete-gitnext-devbox"></div>
 
