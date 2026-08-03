@@ -20,7 +20,8 @@ graph TD
     end
 
     subgraph Server ["内网穿透服务器 (公网 IP)"]
-        RatholeServer["rathole 服务端<br/>(监听 2333 & 22001-22004)"]
+        HAProxy["HAProxy 前置代理<br/>对外监听 0.0.0.0:57392<br/>转发到 127.0.0.1:42816"]
+        RatholeServer["rathole 服务端<br/>隧道控制通道监听 127.0.0.1:42816<br/>业务端口监听 0.0.0.0:22001-22004"]
     end
 
     subgraph Farm ["鸿蒙 PC 设备农场 (内网环境)"]
@@ -34,10 +35,12 @@ graph TD
     %% 连线关系 (注意这里给包含括号的文本加了双引号)
     Executer -->|"SSH 操作 (22001-22004)"| RatholeServer
 
-    PC1 -.->|通过 2333 建立隧道| RatholeServer
-    PC2 -.->|通过 2333 建立隧道| RatholeServer
-    PC3 -.->|通过 2333 建立隧道| RatholeServer
-    PC4 -.->|通过 2333 建立隧道| RatholeServer
+    PC1 -.->|"通过 57392 建立隧道"| HAProxy
+    PC2 -.->|"通过 57392 建立隧道"| HAProxy
+    PC3 -.->|"通过 57392 建立隧道"| HAProxy
+    PC4 -.->|"通过 57392 建立隧道"| HAProxy
+
+    HAProxy -->|"转发到 127.0.0.1:42816"| RatholeServer
 
     RatholeServer -.-> |转发 22001 到 8022| PC1
     RatholeServer -.-> |转发 22002 到 8022| PC2
@@ -67,14 +70,11 @@ graph TD
 
 ### 2.3 放通安全组
 
-修改内网穿透服务器的安全组，放通 2333 和 22001~22004 端口。
-
-出于安全考虑，建议不要直接对 0.0.0.0 放通，而是仅对特定的白名单 IP 放通：
-
-- 2333 只对鸿蒙 PC 的公网出口 IP 放通。在鸿蒙 PC 上访问 `https://cip.cc/` 可以查到自己的公网出口 IP。家庭宽带的公网出口 IP 会不定期变化，变化后需要重新更改安全组。
-- 22001~22004 只对控制设备放通。你想用哪台服务器去控制鸿蒙 PC，就对那台服务器放通。
+修改内网穿透服务器的安全组，放通 57392 和 22001~22004 端口。若客户端公网出口 IP 固定，建议仅对客户端公网出口 IP 放通；出口 IP 不固定时对 0.0.0.0 放通。
 
 ## 3 配置内网穿透服务器
+
+### 3.1 配置 rathole
 
 首先需要在 Linux 服务器上下载 rathole
 
@@ -94,16 +94,28 @@ mv rathole /opt/rathole/bin/rathole
 rm rathole-aarch64-unknown-linux-musl.zip
 ```
 
+为 Noise Protocol 生成一对 X25519 密钥
+
+```sh
+/opt/rathole/bin/rathole --genkey
+```
+
 创建 rathole 配置文件 `/opt/rathole/server.toml`
 
 ```ini
 [server]
-# rathole 通信端口
-bind_addr = "0.0.0.0:2333"
+bind_addr = "127.0.0.1:42816"
+
+[server.transport]
+# 启用 Noise Protocol
+type = "noise"
+
+[server.transport.noise]
+# 上面 `rathole --genkey` 生成的 Private Key
+local_private_key = "your_server_private_key_here"
 
 [server.services.pc_1]
-# token 可以用这个命令生成：openssl rand -hex 16
-# 不同 service 应使用不同的 token
+# token 用 openssl rand -hex 16 生成，不同 service 各不相同
 token = "your_secure_token_here"
 # 需要对公网暴露的端口
 bind_addr = "0.0.0.0:22001"
@@ -146,6 +158,9 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=rathole
+LimitNOFILE=65536
+TasksMax=256
+LimitCORE=0
 
 [Install]
 WantedBy=multi-user.target
@@ -157,6 +172,89 @@ WantedBy=multi-user.target
 systemctl daemon-reload
 systemctl enable rathole.service
 systemctl start rathole.service
+```
+
+### 3.2 配置 HAProxy
+
+安装 HAProxy
+
+```sh
+apt install -y haproxy
+```
+
+在 `/etc/haproxy/haproxy.cfg` 末尾追加
+
+```ini
+# ==== rathole 前置代理（防握手层洪泛）====
+frontend rathole_in
+	bind *:57392
+	mode tcp
+	log global
+	option tcplog
+	# 控制通道靠应用层心跳（30s）保活，超时设 1h 更保险，不用 defaults 的 50s
+	timeout client 1h
+	# 每 IP 限速：60 秒内超过 20 个新连接则拒绝
+	stick-table type ip size 1m expire 60s store conn_rate(60s)
+	tcp-request connection track-sc0 src
+	tcp-request connection reject if { sc0_conn_rate gt 20 }
+	# 2 秒内未收满完整 Noise 握手首包（≥48 字节）则拒绝
+	tcp-request inspect-delay 2s
+	tcp-request content accept if { req_len ge 48 }
+	tcp-request content reject
+	default_backend rathole_back
+
+backend rathole_back
+	mode tcp
+	timeout connect 5s
+	timeout server 1h
+	server rathole 127.0.0.1:42816
+```
+
+启动 HAProxy
+
+```sh
+systemctl enable haproxy
+systemctl restart haproxy
+```
+
+### 3.3 配置 Fail2ban
+
+在 HAProxy 前置代理所在的内网穿透服务器上启用 Fail2ban，对被代理层反复拒绝的来源 IP（洪泛/探测）自动封禁。
+
+安装 Fail2ban
+
+```sh
+apt install -y fail2ban
+```
+
+创建过滤器 `/etc/fail2ban/filter.d/haproxy-rathole.conf`
+
+```ini
+[Definition]
+# 被代理层拒绝的连接（tcp-request reject），终止状态 PR，带真实客户端 IP
+failregex = ^.*haproxy\[\d+\]: <HOST>:\d+ \[[^\]]*\] rathole_in \S+ -\d+/-\d+/\d+ \d+ PR .*$
+ignoreregex =
+```
+
+创建 jail 配置 `/etc/fail2ban/jail.d/haproxy-rathole.local`
+
+```ini
+[haproxy-rathole]
+enabled = true
+backend = auto
+logpath = /var/log/haproxy.log
+filter = haproxy-rathole
+# 1 小时内被代理层拒绝 5 次即封禁 1 天（洪泛/探测源）
+maxretry = 5
+findtime = 1h
+bantime = 1d
+```
+
+启动 Fail2ban
+
+```sh
+systemctl enable fail2ban
+systemctl restart fail2ban
 ```
 
 ## 4 配置鸿蒙 PC
@@ -199,8 +297,16 @@ rm formula.jws.json $RATHOLE_BOTTLE
 
 ```ini
 [client]
-# 云服务器的 IP 和 rathole 通信端口（1.2.3.4 替换成你云服务器的公网 IP）
-remote_addr = "1.2.3.4:2333"
+# 云服务器的公网 IP 和 rathole 通信端口（1.2.3.4 替换为实际 IP）
+remote_addr = "1.2.3.4:57392"
+
+[client.transport]
+# 启用 Noise Protocol，必须与服务端一致
+type = "noise"
+
+[client.transport.noise]
+# 服务端 `rathole --genkey` 生成的 Public Key
+remote_public_key = "your_server_public_key_here"
 
 [client.services.pc_1]
 # token 必须与服务端一致
