@@ -158,9 +158,45 @@ RestartSec=10
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=rathole
+
+# ===== 资源限制 =====
 LimitNOFILE=65536
 TasksMax=256
 LimitCORE=0
+MemoryMax=512M
+LimitNPROC=64
+
+# ===== 文件系统隔离 =====
+ReadOnlyPaths=/
+ReadWritePaths=/opt/rathole
+PrivateTmp=true
+InaccessiblePaths=/home /root /run/user
+
+# ===== namespace 隔离 =====
+PrivateMounts=true
+PrivateIPC=true
+
+# ===== 内核接口收紧 =====
+NoNewPrivileges=true
+SystemCallFilter=@system-service
+SystemCallFilter=~@privileged @resources @cpu-emulation @debug @module @mount @swap @clock @setuid @chown @raw-io
+CapabilityBoundingSet=
+AmbientCapabilities=
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+
+# ===== 写权限全局收紧 =====
+ProtectSystem=strict
+DevicePolicy=closed
+ProtectControlGroups=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectKernelTunables=true
+ProtectHostname=true
+ProtectClock=true
+ProtectProc=invisible
+
+# ===== 日志与 IO =====
+StandardInput=null
 
 [Install]
 WantedBy=multi-user.target
@@ -170,8 +206,8 @@ WantedBy=multi-user.target
 
 ```sh
 systemctl daemon-reload
-systemctl enable rathole.service
-systemctl start rathole.service
+systemctl enable rathole
+systemctl start rathole
 ```
 
 ### 3.2 配置 HAProxy
@@ -232,7 +268,7 @@ apt install -y fail2ban
 ```ini
 [Definition]
 # 被代理层拒绝的连接（tcp-request reject），终止状态 PR，带真实客户端 IP
-failregex = ^.*haproxy\[\d+\]: <HOST>:\d+ \[[^\]]*\] rathole_in \S+ -\d+/-\d+/\d+ \d+ PR .*$
+failregex = <HOST>:\d+ \[[^\]]*\] rathole_in \S+ -\d+/-\d+/\d+ \d+ PR .*$
 ignoreregex =
 ```
 
@@ -244,10 +280,10 @@ enabled = true
 backend = auto
 logpath = /var/log/haproxy.log
 filter = haproxy-rathole
-# 1 小时内被代理层拒绝 5 次即封禁 1 天（洪泛/探测源）
+# 1 小时内被代理层拒绝 5 次即封禁 7 天（洪泛/探测源）
 maxretry = 5
 findtime = 1h
-bantime = 1d
+bantime = 7d
 ```
 
 启动 Fail2ban
