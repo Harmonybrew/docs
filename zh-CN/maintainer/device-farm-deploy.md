@@ -20,32 +20,29 @@ graph TD
     end
 
     subgraph Server ["内网穿透服务器 (公网 IP)"]
-        HAProxy["HAProxy 前置代理<br/>对外监听 0.0.0.0:57392<br/>转发到 127.0.0.1:42816"]
-        RatholeServer["rathole 服务端<br/>隧道控制通道监听 127.0.0.1:42816<br/>业务端口监听 0.0.0.0:22001-22004"]
+        RatholeServer["rathole 服务端<br/>隧道控制通道监听 0.0.0.0:57392<br/>业务端口监听 0.0.0.0:22001-22004"]
     end
 
     subgraph Farm ["鸿蒙 PC 设备农场 (内网环境)"]
         direction TB
-        PC1["鸿蒙 PC 1<br/>sshd: 8022"]
-        PC2["鸿蒙 PC 2<br/>sshd: 8022"]
-        PC3["鸿蒙 PC 3<br/>sshd: 8022"]
-        PC4["鸿蒙 PC 4<br/>sshd: 8022"]
+        PC1["鸿蒙 PC 1<br/>sshd: 9022"]
+        PC2["鸿蒙 PC 2<br/>sshd: 9022"]
+        PC3["鸿蒙 PC 3<br/>sshd: 9022"]
+        PC4["鸿蒙 PC 4<br/>sshd: 9022"]
     end
 
     %% 连线关系 (注意这里给包含括号的文本加了双引号)
     Executer -->|"SSH 操作 (22001-22004)"| RatholeServer
 
-    PC1 -.->|"通过 57392 建立隧道"| HAProxy
-    PC2 -.->|"通过 57392 建立隧道"| HAProxy
-    PC3 -.->|"通过 57392 建立隧道"| HAProxy
-    PC4 -.->|"通过 57392 建立隧道"| HAProxy
+    PC1 -.->|"通过 57392 建立隧道"| RatholeServer
+    PC2 -.->|"通过 57392 建立隧道"| RatholeServer
+    PC3 -.->|"通过 57392 建立隧道"| RatholeServer
+    PC4 -.->|"通过 57392 建立隧道"| RatholeServer
 
-    HAProxy -->|"转发到 127.0.0.1:42816"| RatholeServer
-
-    RatholeServer -.-> |转发 22001 到 8022| PC1
-    RatholeServer -.-> |转发 22002 到 8022| PC2
-    RatholeServer -.-> |转发 22003 到 8022| PC3
-    RatholeServer -.-> |转发 22004 到 8022| PC4
+    RatholeServer -.-> |转发 22001 到 9022| PC1
+    RatholeServer -.-> |转发 22002 到 9022| PC2
+    RatholeServer -.-> |转发 22003 到 9022| PC3
+    RatholeServer -.-> |转发 22004 到 9022| PC4
 ```
 
 ## 2 前置准备
@@ -63,18 +60,16 @@ graph TD
 
 | 鸿蒙 PC | sshd 端口 | 内网穿透服务器端口 |
 | ------- | --------- | ------------------ |
-| pc_1    | 8022      | 22001              |
-| pc_2    | 8022      | 22002              |
-| pc_3    | 8022      | 22003              |
-| pc_4    | 8022      | 22004              |
+| pc_1    | 9022      | 22001              |
+| pc_2    | 9022      | 22002              |
+| pc_3    | 9022      | 22003              |
+| pc_4    | 9022      | 22004              |
 
 ### 2.3 放通安全组
 
-修改内网穿透服务器的安全组，放通 57392 和 22001~22004 端口。若客户端公网出口 IP 固定，建议仅对客户端公网出口 IP 放通；出口 IP 不固定时对 0.0.0.0 放通。
+修改内网穿透服务器的安全组，放通 57392 和 22001~22004 端口。仅对受信任的公网出口 IP（CI 执行机出口、鸿蒙 PC 出口）放通，切勿对 0.0.0.0 放通。出口 IP 不固定时应在变更后及时同步安全组规则。
 
 ## 3 配置内网穿透服务器
-
-### 3.1 配置 rathole
 
 首先需要在 Linux 服务器上下载 rathole
 
@@ -104,7 +99,8 @@ rm rathole-aarch64-unknown-linux-musl.zip
 
 ```ini
 [server]
-bind_addr = "127.0.0.1:42816"
+# 隧道控制通道对外监听端口
+bind_addr = "0.0.0.0:57392"
 
 [server.transport]
 # 启用 Noise Protocol
@@ -114,21 +110,21 @@ type = "noise"
 # 上面 `rathole --genkey` 生成的 Private Key
 local_private_key = "your_server_private_key_here"
 
-[server.services.pc_1]
+[server.services.pc_1_ssh]
 # token 用 openssl rand -hex 16 生成，不同 service 各不相同
 token = "your_secure_token_here"
 # 需要对公网暴露的端口
 bind_addr = "0.0.0.0:22001"
 
-[server.services.pc_2]
+[server.services.pc_2_ssh]
 token = "your_secure_token_here"
 bind_addr = "0.0.0.0:22002"
 
-[server.services.pc_3]
+[server.services.pc_3_ssh]
 token = "your_secure_token_here"
 bind_addr = "0.0.0.0:22003"
 
-[server.services.pc_4]
+[server.services.pc_4_ssh]
 token = "your_secure_token_here"
 bind_addr = "0.0.0.0:22004"
 ```
@@ -146,6 +142,8 @@ chown -R rathole:rathole /opt/rathole
 [Unit]
 Description=Rathole Server
 After=network.target
+StartLimitIntervalSec=60
+StartLimitBurst=3
 
 [Service]
 Type=simple
@@ -153,11 +151,14 @@ User=rathole
 Group=rathole
 WorkingDirectory=/opt/rathole
 ExecStart=/opt/rathole/bin/rathole -s /opt/rathole/server.toml
-Restart=on-failure
+Restart=always
 RestartSec=10
+
+# ===== 日志与 IO =====
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=rathole
+StandardInput=null
 
 # ===== 资源限制 =====
 LimitNOFILE=65536
@@ -188,15 +189,18 @@ RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 ProtectSystem=strict
 DevicePolicy=closed
 ProtectControlGroups=true
+ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectKernelLogs=true
-ProtectKernelTunables=true
 ProtectHostname=true
 ProtectClock=true
 ProtectProc=invisible
 
-# ===== 日志与 IO =====
-StandardInput=null
+# ===== 进程硬化补充 =====
+LockPersonality=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+RestrictNamespaces=true
 
 [Install]
 WantedBy=multi-user.target
@@ -208,89 +212,6 @@ WantedBy=multi-user.target
 systemctl daemon-reload
 systemctl enable rathole
 systemctl start rathole
-```
-
-### 3.2 配置 HAProxy
-
-安装 HAProxy
-
-```sh
-apt install -y haproxy
-```
-
-在 `/etc/haproxy/haproxy.cfg` 末尾追加
-
-```ini
-# ==== rathole 前置代理（防握手层洪泛）====
-frontend rathole_in
-	bind *:57392
-	mode tcp
-	log global
-	option tcplog
-	# 控制通道靠应用层心跳（30s）保活，超时设 1h 更保险，不用 defaults 的 50s
-	timeout client 1h
-	# 每 IP 限速：60 秒内超过 20 个新连接则拒绝
-	stick-table type ip size 1m expire 60s store conn_rate(60s)
-	tcp-request connection track-sc0 src
-	tcp-request connection reject if { sc0_conn_rate gt 20 }
-	# 2 秒内未收满完整 Noise 握手首包（≥48 字节）则拒绝
-	tcp-request inspect-delay 2s
-	tcp-request content accept if { req_len ge 48 }
-	tcp-request content reject
-	default_backend rathole_back
-
-backend rathole_back
-	mode tcp
-	timeout connect 5s
-	timeout server 1h
-	server rathole 127.0.0.1:42816
-```
-
-启动 HAProxy
-
-```sh
-systemctl enable haproxy
-systemctl restart haproxy
-```
-
-### 3.3 配置 Fail2ban
-
-在 HAProxy 前置代理所在的内网穿透服务器上启用 Fail2ban，对被代理层反复拒绝的来源 IP（洪泛/探测）自动封禁。
-
-安装 Fail2ban
-
-```sh
-apt install -y fail2ban
-```
-
-创建过滤器 `/etc/fail2ban/filter.d/haproxy-rathole.conf`
-
-```ini
-[Definition]
-# 被代理层拒绝的连接（tcp-request reject），终止状态 PR，带真实客户端 IP
-failregex = <HOST>:\d+ \[[^\]]*\] rathole_in \S+ -\d+/-\d+/\d+ \d+ PR .*$
-ignoreregex =
-```
-
-创建 jail 配置 `/etc/fail2ban/jail.d/haproxy-rathole.local`
-
-```ini
-[haproxy-rathole]
-enabled = true
-backend = auto
-logpath = /var/log/haproxy.log
-filter = haproxy-rathole
-# 1 小时内被代理层拒绝 5 次即封禁 7 天（洪泛/探测源）
-maxretry = 5
-findtime = 1h
-bantime = 7d
-```
-
-启动 Fail2ban
-
-```sh
-systemctl enable fail2ban
-systemctl restart fail2ban
 ```
 
 ## 4 配置鸿蒙 PC
@@ -344,21 +265,21 @@ type = "noise"
 # 服务端 `rathole --genkey` 生成的 Public Key
 remote_public_key = "your_server_public_key_here"
 
-[client.services.pc_1]
+[client.services.pc_1_ssh]
 # token 必须与服务端一致
 token = "your_secure_token_here"
 # 本机的 sshd 端口
-local_addr = "127.0.0.1:8022"
+local_addr = "127.0.0.1:9022"
 ```
 
-> 不同执行机的配置文件内容不一样。比如服务名称，分别是 `pc_1`、`pc_2`、`pc_3`、`pc_4`。此外 token 也各不相同。
+> 不同执行机的配置文件内容不一样。比如服务名称，分别是 `pc_1_ssh`、`pc_2_ssh`、`pc_3_ssh`、`pc_4_ssh`。此外 token 也各不相同。
 
 ### 4.4 启动服务
 
 启动 sshd
 
 ```sh
-~/openssh-10.4p1-ohos-arm64/sbin/sshd -p 8022
+~/openssh-10.4p1-ohos-arm64/sbin/sshd -p 9022
 ```
 
 启动 rathole
@@ -368,6 +289,8 @@ cd ~/rathole
 nohup ~/rathole/0.5.0/bin/rathole -c ~/rathole/client.toml &
 cd ~
 ```
+
+启动完服务后，请勿关闭 HiShell。可以把界面最小化，但不能关闭。关闭 HiShell 可能导致后台进程被杀。
 
 > 如果要停止服务，可以用 pkill 命令：`pkill sshd && pkill rathole`。
 
