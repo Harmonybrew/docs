@@ -70,6 +70,8 @@ brew search [keyword]       # 在软件仓库中通过关键词搜索软件包
 brew install [formula]      # 安装软件包
 brew uninstall [formula]    # 卸载软件包
 brew list                   # 查看已安装的软件包列表
+brew upgrade [formula]      # 升级指定的软件包
+brew upgrade                # 升级所有已安装的软件包
 rm -rf $(brew --cache)      # 清除缓存
 rm -rf /storage/Users/currentUser/.harmonybrew   # 彻底删除 Homebrew 安装目录（比卸载脚本删得更干净）
 ```
