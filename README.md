@@ -76,7 +76,7 @@ rm -rf $(brew --cache)      # 清除缓存
 rm -rf /storage/Users/currentUser/.harmonybrew   # 彻底删除 Homebrew 安装目录（比卸载脚本删得更干净）
 ```
 
-> **注意**：Homebrew 是一套“滚动更新”模式的包管理系统，它对软件包版本的维护策略并不同于 Ubuntu 里面的 apt 或 Red Hat 里面的 yum。如果你未使用过 Homebrew 或其他滚动更新包管理系统，请先知悉它们的特点，以免使用时造成困惑。
+> **注意**：Homebrew 是一套“滚动更新”模式的包管理系统，它对软件包版本的维护策略并不同于 Ubuntu 里面的 apt 或 Red Hat 里面的 yum。如果你从未使用过 Homebrew 或其他滚动更新包管理系统，请先知悉它们的特点，以免使用时造成困惑。
 
 ## 其他文档
 

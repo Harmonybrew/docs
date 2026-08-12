@@ -34,26 +34,26 @@ Harmonybrew 的资源分布在这些 URL 下：
 安装依赖包（若未装）：
 
 ```bash
-sudo apt update && sudo apt install -y nginx curl git    # Debian/Ubuntu
-# 或: sudo yum install -y nginx curl git                 # RHEL/CentOS
+apt update && apt install -y nginx curl git    # Debian/Ubuntu
+# 或: yum install -y nginx curl git                 # RHEL/CentOS
 ```
 
 ## 3 五分钟快速部署（直连版）
 
 ```bash
 # 1. 建目录（静态说明页 + 缓存目录）
-sudo mkdir -p /var/www/harmonybrew-mirror /var/cache/nginx/harmonybrew
-sudo chown -R www-data:www-data /var/cache/nginx 2>/dev/null || sudo chown -R nginx:nginx /var/cache/nginx
+mkdir -p /var/www/harmonybrew-mirror /var/cache/nginx/harmonybrew
+chown -R www-data:www-data /var/cache/nginx 2>/dev/null || chown -R nginx:nginx /var/cache/nginx
 
 # 2. 移除 nginx 默认站点（新装 nginx 时 /etc/nginx/sites-enabled/default 会占用 80 端口，
 #    导致我们的配置 listen 80 冲突，必须先删）
-sudo rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default
 
 # 3. 写 nginx 配置（见 §5.1，复制到 /etc/nginx/conf.d/harmonybrew-mirror.conf）
 #    写根说明页（见 §5.2，复制到 /var/www/harmonybrew-mirror/index.html）
 
 # 4. 校验 + reload
-sudo nginx -t && sudo nginx -s reload
+nginx -t && nginx -s reload
 
 # 5. 自检（应全部 200，/bottles/ 为 404 属正常）
 MIRROR=http://127.0.0.1
@@ -93,7 +93,7 @@ git clone --depth 1 $MIRROR/git/homebrew-core.git /tmp/core-test && rm -rf /tmp/
 
 ```nginx
 # Harmonybrew 镜像站 - 直连版（带缓存）
-# 部署: sudo cp 此文件 /etc/nginx/conf.d/ && sudo nginx -t && sudo nginx -s reload
+# 部署: cp 此文件 /etc/nginx/conf.d/ && nginx -t && nginx -s reload
 # 缓存策略: bottle 超长 TTL（365 天, 永不覆盖）, api/install.sh/brew.tar.gz 短 TTL（10 分钟）, git 不缓存
 
 # ===== 缓存目录（放 conf.d 会被 include 进 http{} 块） =====
@@ -316,7 +316,7 @@ add_header X-Cache-Status $upstream_cache_status always;  # 观察命中: MISS/H
 
 ```bash
 # 清全部缓存
-sudo rm -rf /var/cache/nginx/harmonybrew/* && sudo nginx -s reload
+rm -rf /var/cache/nginx/harmonybrew/* && nginx -s reload
 ```
 
 
@@ -354,7 +354,7 @@ brew update
 
 ```bash
 brew config | grep -iE "DOMAIN|REMOTE"    # 应显示指向镜像的四个变量
-sudo tail -f /var/log/nginx/harmonybrew-mirror.access.log   # install/bottle/api/git 请求都应出现
+tail -f /var/log/nginx/harmonybrew-mirror.access.log   # install/bottle/api/git 请求都应出现
 ```
 
 
@@ -654,22 +654,22 @@ if __name__ == "__main__":
 
 ```bash
 # 1. 建目录（静态说明页 + 缓存目录）
-sudo mkdir -p /var/www/harmonybrew-mirror /var/cache/nginx/harmonybrew
-sudo chown -R www-data:www-data /var/cache/nginx 2>/dev/null || sudo chown -R nginx:nginx /var/cache/nginx
+mkdir -p /var/www/harmonybrew-mirror /var/cache/nginx/harmonybrew
+chown -R www-data:www-data /var/cache/nginx 2>/dev/null || chown -R nginx:nginx /var/cache/nginx
 
 # 2. 删 nginx 默认站点避免 80 端口冲突
-sudo rm -f /etc/nginx/sites-enabled/default
+rm -f /etc/nginx/sites-enabled/default
 
 # 3. 放脚本到固定位置
-sudo mkdir -p /opt/harmonybrew-mirror
-sudo cp forwardproxy.py /opt/harmonybrew-mirror/
-sudo chmod +x /opt/harmonybrew-mirror/forwardproxy.py
+mkdir -p /opt/harmonybrew-mirror
+cp forwardproxy.py /opt/harmonybrew-mirror/
+chmod +x /opt/harmonybrew-mirror/forwardproxy.py
 
 # 4. 写企业版 nginx 配置到 /etc/nginx/conf.d/harmonybrew-mirror.conf（见 §7.4）
 #    写根说明页到 /var/www/harmonybrew-mirror/index.html（同 §5.2）
 
 # 5. 写 systemd unit（把 -u 参数换成你的企业代理地址，无需认证就删掉末尾的 -u http://... 参数）
-sudo tee /etc/systemd/system/forwardproxy.service > /dev/null <<'EOF'
+tee /etc/systemd/system/forwardproxy.service > /dev/null <<'EOF'
 [Unit]
 Description=Harmonybrew Mirror Forward Proxy
 After=network.target
@@ -687,13 +687,13 @@ WantedBy=multi-user.target
 EOF
 
 # 6. 启用脚本（开机自启、崩溃自恢复）
-sudo systemctl daemon-reload
-sudo systemctl enable --now forwardproxy
-sudo systemctl status forwardproxy    # 看运行状态，应 active (running)
+systemctl daemon-reload
+systemctl enable --now forwardproxy
+systemctl status forwardproxy    # 看运行状态，应 active (running)
 ss -tlnp | grep 8888                  # 应见 LISTEN，否则按 §7.6 排查
 
 # 7. reload nginx
-sudo nginx -t && sudo nginx -s reload
+nginx -t && nginx -s reload
 
 # 8. 自检（应全部 200，/bottles/ 为 404 属正常）
 MIRROR=http://127.0.0.1
@@ -868,7 +868,7 @@ server {
 | `StandardOutput`/`StandardError` | 日志统一写 `/var/log/forwardproxy.log`，排查看此文件 |
 | `WantedBy=multi-user.target` | 开机自启 |
 
-改完 unit 后需 `sudo systemctl daemon-reload && sudo systemctl restart forwardproxy` 生效。
+改完 unit 后需 `systemctl daemon-reload && systemctl restart forwardproxy` 生效。
 
 ### 7.6 故障排查
 
@@ -921,16 +921,16 @@ zsh -c "$(curl -fsSL http://<镜像服务器IP或域名>/install.sh)"
 
 ```bash
 # 通用清理（直连版/企业版都做）
-sudo rm /etc/nginx/conf.d/harmonybrew-mirror.conf
-sudo rm -rf /var/www/harmonybrew-mirror /var/cache/nginx/harmonybrew
-sudo nginx -t && sudo nginx -s reload
+rm /etc/nginx/conf.d/harmonybrew-mirror.conf
+rm -rf /var/www/harmonybrew-mirror /var/cache/nginx/harmonybrew
+nginx -t && nginx -s reload
 
 # 企业版额外清理
-sudo systemctl stop forwardproxy
-sudo systemctl disable forwardproxy
-sudo rm /etc/systemd/system/forwardproxy.service
-sudo systemctl daemon-reload
-sudo rm -rf /opt/harmonybrew-mirror
+systemctl stop forwardproxy
+systemctl disable forwardproxy
+rm /etc/systemd/system/forwardproxy.service
+systemctl daemon-reload
+rm -rf /opt/harmonybrew-mirror
 ```
 
 

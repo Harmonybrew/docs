@@ -54,7 +54,8 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
         <code>uname()</code> 函数，使应用程序获取的系统标识始终为
         <code>Linux</code>。详细用法请查看
         <a href="https://atomgit.com/Harmonybrew/uname-is-linux">源码仓</a> 里面的
-        README 文档。
+        README 文档。注意：Harmonybrew 本身以及软件仓库中的软件包并不依赖
+        uname-is-linux，这个工具仅供有特殊需求的用户自行安装使用，且需要显式调用才能生效。
       </td>
     </tr>
     <tr>
@@ -69,7 +70,7 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
       <td>musl-compat</td>
       <td>
         为 OpenHarmony 补充 musl libc 缺失符号的兼容垫片库。当前主要供
-        <code>python@3.14</code>、<code>python@3.13</code>
+        python@3.14、python@3.13
         等 formula 使用。详细用法请看
         <a href="https://atomgit.com/Harmonybrew/musl-compat">源码仓</a> 里面的
         README 文档。
