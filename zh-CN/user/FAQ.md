@@ -18,7 +18,7 @@
   - [OpenHarmony、HarmonyOS 与 GNU/Linux 的关系](#relationship-between-OH-HO-linux)
   - [代码签名机制对我们的影响](#effect-of-code-signing)
   - [应用沙箱环境和非应用沙箱环境的区别](#difference-between-sandbox-and-non-sandbox)
-  - [HMDFS 对我们的影响](#effect-of-hmdfs)
+  - [hmdfs 对我们的影响](#effect-of-hmdfs)
 - 贡献和维护
   - [如何访问流水线？](#how-to-access-pipeline)
   - [如何加入维护团队？](#join-the-maintenance-team)
@@ -314,13 +314,13 @@ Homebrew 并非我们的唯一路径。目前，@hqzing 已同步完成了 pkgsr
 
 <div id="effect-of-hmdfs"></div>
 
-## HMDFS 对我们的影响
+## hmdfs 对我们的影响
 
-关于这方面的背景知识，请参考 [@hqzing](https://atomgit.com/hqzing) 编写的技术博客：[HMDFS 对我们的影响](https://blog.csdn.net/hqzing/article/details/160773683)
+关于这方面的背景知识，请参考 [@hqzing](https://atomgit.com/hqzing) 编写的技术博客：[hmdfs 对我们的影响](https://blog.csdn.net/hqzing/article/details/160773683)
 
-这里仅补充讲解 Harmonybrew 项目里面的情况：我们的 Harmonybrew 正是安装在 `/storage/Users/currentUser` 目录下，在HiShell 环境中，它正是承载在 HMDFS 上的。
+这里仅补充讲解 Harmonybrew 项目里面的情况：我们的 Harmonybrew 正是安装在 `/storage/Users/currentUser` 目录下，在HiShell 环境中，它正是承载在 hmdfs 上的。
 
-既然 HMDFS 有这么多缺陷，为什么 Harmonybrew 还要执意安装在这里呢？
+既然 hmdfs 有这么多缺陷，为什么 Harmonybrew 还要执意安装在这里呢？
 
 这其实是一个极其无奈的选择。在鸿蒙 PC 的应用沙箱内，系统管控非常严格，**这个家目录是目前唯一一个既能让用户有写权限、又能实现跨应用共享的目录**。如果我们想让 Harmonybrew 安装的软件在 HiShell 里能用，在 CodeArts IDE 这种开发工具里也能调用，我们就只能选这里，别无他处。
 
@@ -332,7 +332,7 @@ Homebrew 并非我们的唯一路径。目前，@hqzing 已同步完成了 pkgsr
 
 不过有一点可以让开发者放心：虽然路径看起来一样，但底层的“土壤”不同。
 
-- **在鸿蒙开发板上**，我们首推的使用方法是在 hdc shell 调试终端中使用 Harmonybrew，并没有进入到应用沙箱中。因此，我们也就没有使用应用沙箱提供的家目录，而是直接在常规文件系统中创建了这个路径，所以它不受 HMDFS 限制。
+- **在鸿蒙开发板上**，我们首推的使用方法是在 hdc shell 调试终端中使用 Harmonybrew，并没有进入到应用沙箱中。因此，我们也就没有使用应用沙箱提供的家目录，而是直接在常规文件系统中创建了这个路径，所以它不受 hmdfs 限制。
 - **在鸿蒙容器中**，这个路径也是在容器自己的 rootfs 上创建的，同样没有这些限制。
 
 <div id="how-to-access-pipeline"></div>

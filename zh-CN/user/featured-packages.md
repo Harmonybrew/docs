@@ -93,12 +93,12 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
 # 安装编译工具链和环境伪装工具
 brew install -y devel-base uname-is-linux
 
-# HiShell 环境中，TMPDIR 环境变量的默认值是 /storage/Users/currentUser，这个目录承载在 HMDFS 上
-# 修改这个环境变量，将其指向一个非 HMDFS 的目录，避免因 HMDFS 文件系统缺陷导致编译失败
+# HiShell 环境中，TMPDIR 环境变量的默认值是 /storage/Users/currentUser，这个目录承载在 hmdfs 上
+# 修改这个环境变量，将其指向一个非 hmdfs 的目录，避免因 hmdfs 文件系统缺陷导致编译失败
 export TMPDIR=/data/storage/el2/base/files/tmp
 mkdir -p $TMPDIR
 
-# 使用非 HMDFS 目录作为工作目录，避免因 HMDFS 文件系统缺陷导致编译失败
+# 使用非 hmdfs 目录作为工作目录，避免因 hmdfs 文件系统缺陷导致编译失败
 WORKDIR=/data/storage/el2/base/files/work
 mkdir -p $WORKDIR
 cd $WORKDIR
