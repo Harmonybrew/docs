@@ -59,14 +59,6 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
       </td>
     </tr>
     <tr>
-      <td><div style="min-width: max-content; display: block; white-space: nowrap;">ohos-pip-autosign</div></td>
-      <td>
-        自动对 pip 包里面的 .so 文件进行代码签名。详细用法请查看
-        <a href="https://atomgit.com/Harmonybrew/ohos-pip-autosign">源码仓</a> 里面的
-        README 文档。
-      </td>
-    </tr>
-    <tr>
       <td>musl-compat</td>
       <td>
         为 OpenHarmony 补充 musl libc 缺失符号的兼容垫片库。当前主要供
@@ -164,24 +156,20 @@ cargo build --release
 
 Harmonybrew 软件仓库里面提供的 python 经过了定制化适配，详情请看 python 的 [formula](https://atomgit.com/Harmonybrew/homebrew-core/blob/main/Formula/p/python@3.14.rb)。
 
-由于 Python 官方目前尚未原生支持 aarch64-linux-ohos 平台，为了确保用户能够使用三方库（尤其是包含原生模块的三方库），我们将它的平台三元组硬编码为 aarch64-linux-musl。得益于 OpenHarmony 对 Linux 的兼容性，python 可以直接复用 Linux 现有的生态，直接下载并运行 aarch64-linux-musl 平台的原生二进制制品（如 numpy、scipy 等）。
+Python 官方目前尚未原生支持 aarch64-linux-ohos 平台，为了确保用户能够使用三方库（尤其是包含原生模块的三方库），我们将它的平台三元组硬编码为 aarch64-linux-musl。得益于 OpenHarmony 对 Linux 的兼容性，python 可以直接复用 Linux 现有的生态，直接下载并运行 aarch64-linux-musl 平台的原生二进制制品（如 numpy、cryptography 等）。
 
-该方案在常规 OpenHarmony 设备上均可正常工作，但在鸿蒙 PC 上会面临一个特有的安全限制：当你用 pip 安装这类三方库时，下载到的 so 文件（如 xxx-aarch64-linux-musl\.so）必然不具备鸿蒙 PC 的代码签名，直接加载会导致系统校验失败。
+PyPI 仓库中 aarch64-linux-musl 平台的二进制制品并非为鸿蒙 PC 而构建，因此必然不会具备鸿蒙 PC 的代码签名，不能在鸿蒙 PC 上直接使用。为了解决这个问题，我们对 python 里面的 pip 打了一个自动签名补丁，让它能在安装三方库的时候自动对里面的 so 文件添加代码签名。如此一来，用户在鸿蒙 PC 上就可以正常通过 pip 安装三方库并使用它们。
 
-ohos-pip-autosign 便是为了解决这一痛点而生的工具，它能在 pip 安装过程中自动为这些 so 文件补全代码签名。
 
 以 numpy 为例，在鸿蒙 PC 的 HiShell 环境中安装它的完整流程如下：
 
 ```sh
-# 安装 python 和自动签名工具
-brew install -y python ohos-pip-autosign
+# 安装 python
+brew install -y python
 
-# 激活 venv
+# 激活 venv（Homebrew 里面的 Python 遵循 PEP 668 提案，安装三方库需要激活虚拟环境）
 python3 -m venv .venv
 source .venv/bin/activate
-
-# 激活自动签名工具
-ohos-pip-autosign activate
 
 # 安装 numpy
 pip install numpy
