@@ -162,7 +162,7 @@ brew test sevenzip
 
 如果有修改 formula 的需求，请直接在 homebrew-core 仓库目录进行修改。
 
-以 sevenzip 为例，修改流程如下：
+以 `sevenzip` 为例，修改流程如下：
 
 ```sh
 # 进入核心 tap 目录
@@ -177,6 +177,15 @@ brew install -y -s -v --include-test sevenzip
 # 执行冒烟测试，验证功能
 brew test sevenzip
 ```
+
+修改 formula 时，需要注意递增修订（revision）版本号。
+
+按照 Homebrew 的设计理念，只要你的构建产物发生了改变，就应该递增修订版本号。只有在构建产物不改变的情况下（例如更改注释、调整 formula 格式、重构建等）才不需要递增修订版本
+号。
+
+递增修订版本号的方法：
+- 如果 formula 里面本身已经有 `revision ***`，你需要把数字加一。
+- 如果 formula 里面还没有 `revision ***`，你需要给它添加 `revision 1`。写法可参考现有的其他 formula。
 
 ## 5 提交 PR
 
@@ -223,7 +232,6 @@ git push my-fork main:sevenzip
 | :----------- | :------------------------------------- | :----------------------------------- |
 | 新增 formula | `<formula> <version> (new formula)`    | `make 4.4.1 (new formula)`           |
 | 版本升级     | `<formula> <version>`                  | `ldapvi 1.8`                         |
-| 修订版本升级 | `<formula>: revision bump to <reason>` | `marp-cli: revision bump to node@24` |
 | 修复/增强    | `<formula>: <action>`                  | `tcl-tk: update livecheck blocks`    |
 
 <br/>
@@ -252,6 +260,12 @@ PR 被提交后，维护者需要进行对它进行评审。维护者为 PR 添�
 
 > **为什么要生成“替代 PR”**：因为 AtomGit 平台的能力相比于 GitHub 还是有所欠缺，并不支持设置 “Allow edits by maintainers”，而我们的业务非常依赖该特性（机器人在跑完流水线后需往 PR 中添加新的 commit）。在平台能力有限的情况下，只能通过这种妥协方式实现。
 
+### 5.4 检查邮箱绑定情况
+
+如果你是 AtomGit 的新用户，请前往 [电子邮件](https://atomgit.com/setting/email) 页面，检查自己是否已经将 git 邮箱绑定到 AtomGit 账号上。
+
+虽然在不绑定邮箱的情况下也可以正常提交 PR、合并 PR，但你的账号不会出现在仓库首页的贡献者列表中。为了让大家都能看到你的贡献，我们建议你完成邮箱的绑定。
+
 ## 6 进阶玩法：自动化搬运
 
 如果你已经对这套提交流程驾轻就熟，你会发现：在大部分无需修改源码或打补丁的场景下，搬运工作其实是一套机械化的标准动作。
@@ -264,20 +278,24 @@ PR 被提交后，维护者需要进行对它进行评审。维护者为 PR 添�
 
 如今的 AI Agent 能力已经相当强大，即使在不预设知识库和技能集的情况下，往往也能自动化完成 formula 的鸿蒙适配。
 
-在我们的核心 tap 中，对于那些不能直接继承上游的 formula，里面有一部分便是纯靠 AI 完成的适配，例如 util-linux、openssh、go 等。
+在我们的核心 tap 中，对于那些不能直接继承上游的 formula，里面有一部分便是纯靠 AI 完成的适配，例如 `util-linux`、`openssh`、`go` 等。
 
 这里以 AtomCode 工具为例，演示如何基于这个工具完成一个 formula 的适配：
 
-1. 在 ci-runner 中安装并启动 AtomCode。
+1. 在 ci-runner 中安装 AtomCode。
 
    ```sh
    curl -fsSL https://raw.atomgit.com/atomgit_atomcode/atomcode/raw/main/scripts/install.sh | sh
+   ```
 
+2. 启动 AtomCode
+
+   ```sh
    atomcode
    ```
 
-2. 登录 AtomGit 账号或手动配置 provider，对接好你的所需的大模型。
-3. 下发指令，让其自动编包、定位问题、制作补丁。
+3. 登录 AtomGit 账号或手动配置 provider，对接好你的所需的大模型。
+4. 下发指令，让其自动编包、定位问题、制作补丁。
 
    例如：
 
@@ -297,6 +315,8 @@ PR 被提交后，维护者需要进行对它进行评审。维护者为 PR 添�
    3. 如果需要在 C/C++ 源代码中添加条件编译宏，可使用 __OHOS__ 这个宏来作为判断条件，鸿蒙平台上的编译器会自动传入这个宏。
    4. 编译构建任务耗时较长，所有构建任务请以 background 模式运行，避免因超时被杀进程需要重新来过。
    ```
+
+AI 移植和人工移植一样，必须在标准化的 ci-runner 容器内完成开发工作。禁止在鸿蒙 PC 上通过 `brew install -s` 命令构建 formula。我们已经在 Homebrew 包管理器的代码里面做了限制，用户在鸿蒙 PC 上构建 formula 会得到报错。请勿尝试绕过这个限制，绕过限制做出来的 formula 大概率是不合格的，最终也会难以合入我们的核心 tap 仓库。
 
 ## 8 附录：补丁制作指南
 
