@@ -87,8 +87,7 @@ brew install -y devel-base uname-is-linux
 
 # HiShell 环境中，TMPDIR 环境变量的默认值是 /storage/Users/currentUser，这个目录承载在 hmdfs 上
 # 修改这个环境变量，将其指向一个非 hmdfs 的目录，避免因 hmdfs 文件系统缺陷导致编译失败
-export TMPDIR=/data/storage/el2/base/files/tmp
-mkdir -p $TMPDIR
+export TMPDIR=/data/storage/el2/base/cache
 
 # 使用非 hmdfs 目录作为工作目录，避免因 hmdfs 文件系统缺陷导致编译失败
 WORKDIR=/data/storage/el2/base/files/work
@@ -116,8 +115,8 @@ unset LD_PRELOAD
 # 验证编出来的 gzip 是否能正常运行
 $PREFIX/bin/gzip --help
 
-# 清理临时目录和工作目录
-sh -c "rm -rf $TMPDIR/* $WORKDIR/*"
+# 清理工作目录（临时目录无需手动清理，那个目录承载在 tmpfs 文件系统上）
+rm -rf $WORKDIR
 ```
 
 ### 场景二：编译 Rust 程序
@@ -240,18 +239,12 @@ node test.js
 
 Harmonybrew 软件仓库中的 go 可以开箱即用，无需进行额外配置。
 
-我们在 go 的 [formula](https://atomgit.com/Harmonybrew/homebrew-core/blob/main/Formula/g/go.rb) 中添加了一个自动签名补丁，使 go 在产出 ELF 二进制文件时自动调用 ohos-sdk 中的 binary-sign-tool 进行代码签名，编译出来的程序无需手动签名即可直接在鸿蒙 PC 上运行。
-
-此外，为了支持 cgo 编译，我们在 go 的 [formula](https://atomgit.com/Harmonybrew/homebrew-core/blob/main/Formula/g/go.rb) 中额外添加了依赖声明，让它级联依赖 llvm-gcc-compat。
-
-在 cgo 编译场景中，go 默认会调用 cc 命令作为 C 语言编译器和外部链接器。llvm-gcc-compat 提供的 cc 命令刚好可以满足这一需求。
-
-这个 cc 命令实际上是个软链接，指向了 ohos-sdk 里面的 clang 驱动器。clang 驱动器在进行链接操作时，调用的是经过我们封装的 ld.lld 脚本，因此最终 cgo 编译出来的二进制都会默认带有代码签名，可直接在鸿蒙 PC 上运行。
+我们在 go 的 [formula](https://atomgit.com/Harmonybrew/homebrew-core/blob/main/Formula/g/go.rb) 中添加了一个自动签名补丁，使 go 在产出 ELF 二进制文件时自动为产物添加代码签名，编译出来的程序无需手动签名即可直接在鸿蒙 PC 上运行。
 
 在鸿蒙 PC 的 HiShell 环境中编译并运行一个简单的 Go 程序，操作是这样的：
 
 ```sh
-# 安装 go（ohos-sdk 和 llvm-gcc-compat 会作为级联依赖被自动引入）
+# 安装 go
 brew install -y go
 
 mkdir go-example
@@ -271,4 +264,39 @@ EOF
 # 编译并运行
 go build -o hello hello.go
 ./hello
+```
+
+如果你需要使用 cgo，可额外安装 llvm-gcc-compat，之后 cgo 编译即可开箱即用。
+
+在 cgo 编译场景中，go 默认会调用 cc 命令作为 C 语言编译器和外部链接器。llvm-gcc-compat 提供的 cc 命令刚好可以满足这一需求。
+
+这个 cc 命令实际上是个软链接，指向了 ohos-sdk 里面的 clang 驱动器。clang 驱动器在进行链接操作时，调用的是经过我们封装的 ld.lld 脚本，因此最终 cgo 编译出来的二进制都会默认带有代码签名，可直接在鸿蒙 PC 上运行。
+
+在鸿蒙 PC 的 HiShell 环境中编译并运行一个简单的 cgo 程序，操作是这样的：
+
+```
+# 安装 go 和 llvm-gcc-compat（ohos-sdk 会作为级联依赖被自动引入）
+brew install -y go llvm-gcc-compat
+
+mkdir cgo-example
+cd cgo-example
+
+# 编写一个 cgo 程序
+cat > hello_cgo.go << 'EOF'
+package main
+
+/*
+#include <stdio.h>
+void hello() { printf("%s\n", "Hello from cgo!"); fflush(stdout); }
+*/
+import "C"
+
+func main() {
+    C.hello()
+}
+EOF
+
+# 编译并运行
+CGO_ENABLED=1 go build -o hello_cgo hello_cgo.go
+./hello_cgo
 ```
