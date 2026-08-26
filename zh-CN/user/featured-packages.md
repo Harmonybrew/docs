@@ -121,9 +121,7 @@ rm -rf $WORKDIR
 
 ### 场景二：编译 Rust 程序
 
-Harmonybrew 软件仓库中的 rust 可以开箱即用，无需进行额外配置。
-
-能做到这一点，是因为我们在 rust 的 [formula](https://atomgit.com/Harmonybrew/homebrew-core/blob/main/Formula/r/rust.rb) 中额外添加了依赖声明，让它级联依赖 llvm-gcc-compat。
+你只需要同时安装 rust 和 llvm-gcc-compat 这两个包，即可享受到开箱即用的 rust 开发体验。
 
 在不配置任何 config.toml 的情况下，rustc 默认会调用 cc 命令作为 linker。llvm-gcc-compat 提供的 cc 命令刚好可以满足这一需求。
 
@@ -132,8 +130,8 @@ Harmonybrew 软件仓库中的 rust 可以开箱即用，无需进行额外配�
 在鸿蒙 PC 的 HiShell 环境中编译并运行一个简单的 Rust 程序，操作是这样的：
 
 ```sh
-# 安装 rust（ohos-sdk 和 llvm-gcc-compat 会作为级联依赖被自动引入）
-brew install -y rust
+# 安装 rust 和 llvm-gcc-compat（ohos-sdk 会作为级联依赖被自动引入）
+brew install -y rust llvm-gcc-compat
 
 # 创建一个简单的 cargo 工程并将其编译成二进制
 cargo new hello_project
