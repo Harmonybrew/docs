@@ -63,20 +63,17 @@
 
 <br>
 
-因此，你首先需要准备一个能够运行 [DockerHarmony](https://github.com/hqzing/dockerharmony) 的环境。
+由于我们使用的容器是一个 arm64 架构的鸿蒙容器，因此你首先需要准备一个能够运行 arm64 容器的环境。
 
 相关要求如下：
 
-- **硬件要求**：建议使用 arm64 原生硬件，例如 arm 服务器、Mac 电脑、鸿蒙 PC 等。如果没有 arm64 硬件，则需要通过 QEMU 进行指令集翻译，性能极差。
-- **网络要求**：构建过程中需实时从 GitHub 下载源码，请确保开发环境能够流畅访问 GitHub。建议选用香港或海外地域的 arm 服务器。
-
-<br>
-
-> 在鸿蒙 PC 中运行 DockerHarmony 的操作流程可参考 [这篇博客](https://blog.csdn.net/hqzing/article/details/155165753)。
+- **硬件要求**：请在 arm64 原生硬件上运行容器，例如 arm 服务器、Mac 电脑、[鸿蒙 PC](running-docker-container-on-pc.md) 等。不提倡在 x86\_64 设备上通过指令集翻译的方式使用 arm64 容器，这种做法性能极差，难以满足编译构建需求。
+- **网络要求**：构建过程中有可能会需要从 GitHub 下载源码，请确保开发环境能够流畅访问 GitHub。建议选用香港或海外地域的 arm 服务器。
+- **软件要求**：已安装 Docker 引擎或 Podman 等替代品。
 
 ### 3.2 启动并进入容器
 
-从华为云 SWR 拉取最新 [ci-runner](https://atomgit.com/Harmonybrew/ci/blob/main/ci-runner/Dockerfile) 镜像并启动：
+从华为云 SWR 拉取最新 ci-runner 镜像并启动：
 
 ```sh
 docker pull swr.cn-north-4.myhuaweicloud.com/harmonybrew/ci-runner:latest
@@ -86,7 +83,7 @@ docker run -itd --name=ohos swr.cn-north-4.myhuaweicloud.com/harmonybrew/ci-runn
 docker exec -it ohos sh
 ```
 
-这个镜像是我们的流水线镜像。它是 DockerHarmony 的二次封装，预置了必要的开发工具。我们将这个镜像对外公开，作为标准化的开发环境供贡献者使用。
+这个 ci-runner 镜像是我们的流水线镜像。它是 [DockerHarmony](https://github.com/hqzing/dockerharmony) 的二次封装，里面预置了必要的开发工具。我们将这个镜像对外公开，作为标准化的开发环境供贡献者使用。用户可从 SWR 拉取现成的镜像，或使用 [源码](https://atomgit.com/Harmonybrew/ci/blob/main/ci-runner/Dockerfile) 自行构建出镜像。
 
 > **注意**：镜像会持续更新。建议在每次工作前执行一次 `docker pull` 更新镜像，并删除已有的旧容器、重新创建容器，确保每次使用的是最新、最干净的开发环境。
 
@@ -178,10 +175,12 @@ brew install -y -s -v --include-test sevenzip
 brew test sevenzip
 ```
 
-修改 formula 时，需要注意递增修订（revision）版本号。
+修改 formula 时，需要注意修订（revision）版本号的问题：
+- 如果你升级了软件版本，需要检查 formula 中是否存在 `revision ***` 这种修订版本号声明。如果有，需要将其删除。因为升级软件版本后需要将修订版本号清零。
+- 如果你未升级软件版本，且你的更改会导致构建产物发生改变，你应该递增修订版本号。
+- 如果你未升级软件版本，且你的更改不会导致构建产物发生改变（例如更改注释、调整 formula 格式、重构建等），则不需要递增修订版本号。
 
-按照 Homebrew 的设计理念，只要你的构建产物发生了改变，就应该递增修订版本号。只有在构建产物不改变的情况下（例如更改注释、调整 formula 格式、重构建等）才不需要递增修订版本
-号。
+<br>
 
 递增修订版本号的方法：
 - 如果 formula 里面本身已经有 `revision ***`，你需要把数字加一。
@@ -242,7 +241,7 @@ git push my-fork main:sevenzip
 
 ### 5.3 提交 PR
 
-去 AtomGit 网页上操作，从自己的个人仓往 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core) 提交 PR。
+去 AtomGit 网页上操作，从自己的个人仓往 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core) 提交 PR。我们在仓库中设置了 PR 模板，提交 PR 时网页上会展示 PR 模板，你需要按照模板填写信息。
 
 PR 被提交后，维护者需要进行对它进行评审。维护者为 PR 添加 `request-ci` 标签即视为评审通过。评审通过后，流水线会自动执行门禁检查、构建、测试、打包等动作。构建结束后，机器人会将构建日志链接发至 PR 讨论区。
 
