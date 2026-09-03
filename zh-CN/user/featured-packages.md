@@ -268,8 +268,6 @@ go build -o hello hello.go
 
 在 cgo 编译场景中，go 默认会调用 cc 命令作为 C 语言编译器和外部链接器。llvm-gcc-compat 提供的 cc 命令刚好可以满足这一需求。
 
-这个 cc 命令实际上是个软链接，指向了 ohos-sdk 里面的 clang 驱动器。clang 驱动器在进行链接操作时，调用的是经过我们封装的 ld.lld 脚本，因此最终 cgo 编译出来的二进制都会默认带有代码签名，可直接在鸿蒙 PC 上运行。
-
 在鸿蒙 PC 的 HiShell 环境中编译并运行一个简单的 cgo 程序，操作是这样的：
 
 ```
