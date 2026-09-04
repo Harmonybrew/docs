@@ -4,9 +4,9 @@
 
 本文档供项目维护者或有二次开发需求（需要自己部署一整套 Harmonybrew 项目）的用户用作参考，普通用户无需阅读。
 
-本项目的 CI 系统基于华为云基础设施构建，因此文档中的资源操作及配置均以华为云为基准进行描述。动手能力强的开发者可参考其逻辑，自行迁移至其他云厂商。
+本项目的 CI 系统基于“华为云基础设施 + 开源流水线系统 [Buildbot](https://github.com/buildbot/buildbot)”构建。动手能力强的开发者可参考其逻辑，自行迁移至其他云厂商或其他流水线系统。
 
-接下来以二次开发的场景为例，讲解流水线的部署流程。
+> 由于项目迭代频率高，本文档中的操作不保证能完美复现，仅供参考。
 
 ## 2 前置准备
 
@@ -14,23 +14,21 @@
 
 需要准备一些服务器，承担不同的职责。
 
-这里假设我们准备了 6 台服务器，我们分别给他们取不同的名字、分配不同的职责
+这里假设我们准备了 5 台服务器，我们分别给他们取不同的名字、分配不同的职责
 
-| 主机名         | 职责                                                 |
-| -------------- | ---------------------------------------------------- |
-| image-builder  | 专门用来跑 auto_images.sh，负责构建出 ci-runner 镜像 |
-| webhook-filter | 专门用来跑 webhook_filter.py，负责过滤 webhook 报文  |
-| ci-runner-1    | 其他流水线脚本都跑在这些机器上                       |
-| ci-runner-2    | 其他流水线脚本都跑在这些机器上                       |
-| ci-runner-3    | 其他流水线脚本都跑在这些机器上                       |
-| ci-runner-4    | 其他流水线脚本都跑在这些机器上                       |
+| 主机     | 职责                                                               |
+| -------- | ------------------------------------------------------------------ |
+| master   | 作为 Buildbot 的 Master 节点，负责调度 CI 任务、提供 Web 页面      |
+| worker-1 | 作为 Buildbot 的 Worker 节点，负责运行流水线脚本、执行编译构建任务 |
+| worker-2 | 作为 Buildbot 的 Worker 节点，负责运行流水线脚本、执行编译构建任务 |
+| worker-3 | 作为 Buildbot 的 Worker 节点，负责运行流水线脚本、执行编译构建任务 |
+| worker-4 | 作为 Buildbot 的 Worker 节点，负责运行流水线脚本、执行编译构建任务 |
 
 这些服务器需要满足以下条件：
 
-1. 是 arm 服务器，不是 x86 服务器
+1. Ubuntu 24.04 arm64
 2. Region 在香港或国外（CI 执行过程中需要去 GitHub 下载源码和开发工具，中国大陆的服务器无法稳定访问 GitHub）
-3. 安装好 JDK，版本在 JDK 8 以上
-4. 安装好 Docker
+3. 使用 root 用户
 
 ### 2.2 域名
 
@@ -57,30 +55,7 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
 
 需要在 SWR 控制台里面创建一个组织。流水线构建出来的 Docker 镜像会上传到这个组织上。
 
-### 2.5 代码仓
-
-1. 在 AtomGit 上面创建一个新的组织，名字和 Region 随意。
-2. 将 Harmonybrew 组织下的所有代码仓全部 fork 一份到这个新的组织下。
-3. 把 `brew`、`install`、`ci` 这 3 个仓库下载到本地，进行修改，把里面的组织名字和 CDN 加速域名都替换成自己的数据。
-
-   对 3 个仓库都执行这个操作
-
-   ```sh
-   # 假设你的组织名字为 Brewharmony、CDN 加速域名为 cdn.brewharmony.com
-   find . -type f -not -path '*/.git/*' -exec sed -i 's@atomgit.com/Harmonybrew@atomgit.com/Brewharmony@g' {} +
-   find . -type f -not -path '*/.git/*' -exec sed -i 's@harmonybrew.atomgit.com@cdn.brewharmony.com@g' {} +
-   ```
-
-   对 brew 仓库还需额外执行这个操作
-
-   ```sh
-   # 假设你的组织名字为 Brewharmony
-   find . -type f -not -path '*/.git/*' -exec sed -i 's@Harmonybrew@Brewharmony@g' {} +
-   ```
-
-4. 把改好的代码提交回你的组织里面。
-
-### 2.6 环境变量
+### 2.5 环境变量
 
 准备好以下环境变量的值，接下来的部署步骤会用上。
 
@@ -146,367 +121,402 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
   </tbody>
 </table>
 
-## 3 创建 CodeArts 项目
+## 3 配置 Master
 
-1. 进入 CodeArts 服务的工作台，点击右上角进入工作台。
-2. 进入工作台后，创建新项目。名称任意，类型是 Scrum。
+Master 是调度中心，负责管理 Worker、接收 Webhook、分发构建任务。以下命令在 Master 服务器上执行。Web UI 和 Webhook 均通过 Master 对外暴露。
 
-## 4 创建资源池
+### 3.1 创建系统用户
 
-1. 在 CodeArts 服务的工作台，找到左侧菜单的 “持续交付”-“编译构建”，点进去。
-2. 在“编译构建”页面的右上角找到“资源池管理”，点进去。
-3. 在“资源池管理”页面，找到“新建资源池”按钮，点击它，选择“自定义资源池”。
-4. 创建第一个资源池。资源池名称：`ci-runner`；类型：`LINUX-DOCKER`
-5. 创建第二个资源池。资源池名称：`image-builder`；类型：`LINUX`
+以专用用户 `buildbot` 运行服务，隔离权限。
 
-## 5 注册执行机
+```bash
+useradd -r -s /bin/bash -d /opt/buildbot -m buildbot
+passwd -l buildbot
+```
 
-1. 进入资源池管理界面，点击资源池的名称 `ci-runner`。
-2. 在 `ci-runner` 资源池的详情页面，点右上角“新建代理”。
-3. 配置代理信息：
-   - 上半部分除“重启免注册”以外，其他开关都不要开启；
-   - 下半部分录入你提前准备好的 AK/SK，代理名称填 `ci-runner-1`，代理工作空间填 `/opt/ci-runner-1`
-4. 配置完成后，点击“生成命令”、“复制命令”，生成的命令粘贴到服务器中执行。
-5. 如果有多台执行机，就重复执行 3、4 步骤。执行机命名规则：`ci-runner-1`、`ci-runner-2` ...
-6. 进入 `image-builder` 资源池的详情页面，同样执行 3、4 步骤，涉及到名字的地方都命名为 `image-builder`。这个资源池不常用，只注册一台执行机即可。
+### 3.2 安装 Python 虚拟环境
 
-## 6 创建编译构建任务
+独立隔离 Buildbot 依赖，不污染系统 Python。
 
-1. 进入“编译构建”界面，新建一个任务
-   - 名称：`auto-bottle 任务`
-   - 代码源：来自流水线
-   - 使用空白构建模板
-   - 选择 `ci-runner` 资源池
-   - 点击左边“添加构建步骤”，选“容器类”-“使用SWR公共镜像”
-   - 构建步骤添加出来后，填写信息。
-     - 名称：随意
-       - 镜像地址：根据你注册的 SWR 组织信息构造出 ci-runner 镜像的下载地址。假设你的组织名字为 brewharmony、Region 在北京四，那你的镜像下载地址就是这样：`swr.cn-north-4.myhuaweicloud.com/brewharmony/ci-runner:latest`
-       - 命令：`python3 src/auto_bottle.py`
-2. 以同样的操作，将 `auto-merge`、`auto-bump`、`auto-static`、`auto-stats`、`auto-clear` 这几个任务也都创建出来。这些任务除了脚本名字不一样以外其他配置完全相同。
-3. 进入“编译构建”界面，新建一个任务
-   - 名称：`auto-image 任务`
-   - 代码源：来自流水线
-   - 使用空白构建模板
-   - 选择 `image-builder` 资源池
-   - 点击左边“添加构建步骤”，选“所有步骤”-“执行shell命令”
-   - 构建步骤添加出来后，填写信息。名称：随意；命令：`sh src/auto_image.sh`
+```bash
+mkdir -p /opt/buildbot/masters/default
+python3 -m venv /opt/buildbot/.venv
+/opt/buildbot/.venv/bin/pip install buildbot[bundle]
+# 设置目录权限
+chown -R buildbot:buildbot /opt/buildbot/
+```
 
-## 7 配置编译构建任务参数
+### 3.3 初始化 Master
 
-对上面创建出来的所有编译构建任务，全部进行一遍参数设置。
+生成 Master 骨架目录，包含默认配置文件 `master.cfg` 和 `buildbot.tac`。
 
-操作方法：进入“编译构建”界面，点击任务名字进入详情页面，点击右上角“参数设置”，录入自定义参数。
+```bash
+/opt/buildbot/.venv/bin/buildbot create-master /opt/buildbot/masters/default
+```
 
-各任务涉及到的参数如下，所需参数在最开始的“前置准备”已经准备好，直接录入即可：
+### 3.4 写入 master.cfg
 
-<table>
-  <tr>
-    <th>任务</th>
-    <th>需要录入的参数</th>
-  </tr>
+下载 master.cfg 模板文件
 
-  <tr>
-    <td>auto-bottle 任务</td>
-    <td>
-      <ul>
-        <li>ATOMGIT_TOKEN</li>
-        <li>HUAWEICLOUD_SDK_AK</li>
-        <li>HUAWEICLOUD_SDK_SK</li>
-        <li>OBS_BUCKET</li>
-        <li>OBS_REGION</li>
-        <li>WEBHOOK_PAYLOAD（不用填默认值，开启“运行时设置”即可）</li>
-        <li>PIPELINE_ID（不用填默认值，开启“运行时设置”即可）</li>
-        <li>PIPELINE_RUN_ID（不用填默认值，开启“运行时设置”即可）</li>
-        <li>PIPELINE_NUMBER（不用填默认值，开启“运行时设置”即可）</li>
-      </ul>
-    </td>
-  </tr>
+```bash
+curl -fsSL -o /opt/buildbot/masters/default/master.cfg https://raw.gitcode.com/Harmonybrew/ci/raw/main/buildbot/master.cfg
+```
 
-  <tr>
-    <td>auto-merge 任务</td>
-    <td>
-      <ul>
-        <li>ATOMGIT_TOKEN</li>
-        <li>HUAWEICLOUD_SDK_AK</li>
-        <li>HUAWEICLOUD_SDK_SK</li>
-        <li>OBS_BUCKET</li>
-        <li>OBS_REGION</li>
-        <li>JWS_SIGNING_KEY</li>
-        <li>JWS_SIGNING_KEY_ID</li>
-      </ul>
-    </td>
-  </tr>
+Master 核心配置包含 Worker、Scheduler、Builder 工厂、Web UI 等。
 
-  <tr>
-    <td>auto-bump 任务</td>
-    <td>
-      <ul>
-        <li>HOMEBREW_ATOMGIT_API_TOKEN</li>
-        <li>HOMEBREW_GITHUB_API_TOKEN</li>
-      </ul>
-    </td>
-  </tr>
+**填充模板**
 
-  <tr>
-    <td>auto-static 任务</td>
-    <td>
-      <ul>
-        <li>HUAWEICLOUD_SDK_AK</li>
-        <li>HUAWEICLOUD_SDK_SK</li>
-        <li>OBS_BUCKET</li>
-        <li>OBS_REGION</li>
-      </ul>
-    </td>
-  </tr>
+将模板文件占位符用实际值进行填充，其中的密码用 `openssl rand` 命令生成。
 
-  <tr>
-    <td>auto-stats 任务</td>
-    <td>
-      <ul>
-        <li>HUAWEICLOUD_SDK_AK</li>
-        <li>HUAWEICLOUD_SDK_SK</li>
-        <li>OBS_BUCKET</li>
-        <li>OBS_REGION</li>
-      </ul>
-    </td>
-  </tr>
+```bash
+worker_password=$(openssl rand -base64 14)
+web_ui_password=$(openssl rand -hex 8)
+sed -i "s/YOUR_WORKER_PASSWORD/${worker_password}/g" /opt/buildbot/masters/default/master.cfg
+sed -i "s/YOUR_WEBUI_PASSWORD/${web_ui_password}/g" /opt/buildbot/masters/default/master.cfg
 
-  <tr>
-    <td>auto-clear 任务</td>
-    <td>
-      <ul>
-        <li>HUAWEICLOUD_SDK_AK</li>
-        <li>HUAWEICLOUD_SDK_SK</li>
-        <li>OBS_BUCKET</li>
-        <li>OBS_REGION</li>
-      </ul>
-    </td>
-  </tr>
+# 将占位符 YOUR_PUBLIC_IP 替换成 master 节点的公网 IP，这里假设这个值为 1.2.3.4
+sed -i "s/YOUR_PUBLIC_IP/1.2.3.4/g" /opt/buildbot/masters/default/master.cfg
 
-  <tr>
-    <td>auto-image 任务</td>
-    <td>
-      <ul>
-        <li>SWR_REGION</li>
-        <li>SWR_ORGANIZATION</li>
-      </ul>
-    </td>
-  </tr>
-</table>
+# 将占位符 YOUR_OBS_BUCKET 替换成章节 2.5 里面的 OBS_BUCKET，这里假设这个值为 harmonybrew
+sed -i "s/YOUR_OBS_BUCKET/harmonybrew/g" /opt/buildbot/masters/default/master.cfg
 
-## 8 新建服务扩展点
+# 将占位符 YOUR_OBS_REGION 替换成章节 2.5 里面的 OBS_REGION，这里假设这个值为 cn-north-4
+sed -i "s/YOUR_OBS_REGION/cn-north-4/g" /opt/buildbot/masters/default/master.cfg
 
-1. 进入 CodeArts 服务的工作台，找到“通用设置”-“服务扩展点管理”，点击“新建服务扩展点”。类型选 GitCode（CodeArts 平台现在还不认识 GitCode 的新名字，只能用旧名字）；连接名称是自定义的，这里填 harmonybrew；token 填你注册的那个 AtomGit 机器人账号的 token。
+# 将占位符 YOUR_SWR_REGION 替换成章节 2.5 里面的 SWR_REGION，这里假设这个值为 cn-north-4
+sed -i "s/YOUR_SWR_REGION/cn-north-4/g" /opt/buildbot/masters/default/master.cfg
 
-## 9 创建流水线
+# 将占位符 YOUR_SWR_ORGANIZATION 替换成章节 2.5 里面的 SWR_ORGANIZATION，这里假设这个值为 harmonybrew
+sed -i "s/YOUR_SWR_ORGANIZATION/harmonybrew/g" /opt/buildbot/masters/default/master.cfg
+```
 
-1. 在 CodeArts 服务的工作台，找到左侧菜单的 “持续交付”-“流水线”，点进去，创建一条流水线。
-   - 名称：auto-bottle
-   - 流水线源：GitCode
-   - 服务扩展点：harmonybrew
-   - 代码仓：ci（指向你 fork 的 ci 仓库）
-   - 默认分支：main
-   - 选择模板：空模板
-2. 编辑 auto-bottle 流水线，点击上方菜单“任务编排”，点击“阶段\_1”里面的“新建任务”。
-   - 选择“Build构建”
-   - 名称：auto-bottle
-   - 任务：auto-bottle 任务
-   - 仓库：ci
+### 3.5 写入 atomgit_webhook.py
 
-按照相同的方法，将 `auto-merge`、`auto-bump`、`auto-static`、`auto-stats`、`auto-clear`、`auto-image` 这几条流水线创建出来。他们之间的区别只有触发设置不同，前面的创建步骤是一样的。
+该文件是自定义 Webhook Handler，用于解析 AtomGit merge_request 事件并过滤后注入 Buildbot Change。
 
-流水线创建完成后，依次修改各个流水线的触发设置：
+```bash
+curl -fsSL -o /opt/buildbot/masters/default/atomgit_webhook.py https://raw.gitcode.com/Harmonybrew/ci/raw/main/buildbot/atomgit_webhook.py
+```
 
-<table>
-  <tr>
-    <th>流水线</th>
-    <th>触发设置</th>
-  </tr>
+### 3.6 填写 secrets_store 中的密钥
 
-  <tr>
-    <td>auto-bottle</td>
-    <td>
-      <ul>
-        <li>启用 Webhook，关闭 IAM 认证。</li>
-        <li>开启“并发策略”，把并发个数设置得跟你的执行机数量一致。超过并发后执行策略是“排队等待”</li>
-      </ul>
-    </td>
-  </tr>
+密钥存储在 secrets_store 目录下的文件中，通过 `SecretInAFile` 读取，Buildbot 自动在日志中遮蔽。
 
-  <tr>
-    <td>auto-merge</td>
-    <td>
-      <ul>
-        <li>定时任务， corn 表达式是 `0 0/10 * * * ?`（每 10 分钟执行一次）</li>
-        <li>开启“并发策略”，并发个数固定为1。超过并发后执行策略是“忽略不执行”</li>
-      </ul>
-    </td>
-  </tr>
+```bash
+# 创建目录
+mkdir -p /opt/buildbot/masters/default/secrets_store
+chown -R buildbot:buildbot /opt/buildbot/masters/default/secrets_store
+```
 
-  <tr>
-    <td>auto-bump</td>
-    <td>
-      <ul>
-        <li>定时任务， corn 表达式是 `0 0 6 * * ?`（每天 6:00 执行一次）</li>
-      </ul>
-    </td>
-  </tr>
+以下每个文件写入真实密钥值（替换 `你的…` 占位符）：
 
-  <tr>
-    <td>auto-static</td>
-    <td>
-      <ul>
-        <li>不开启任何触发设置（也就是仅允许手动触发）</li>
-      </ul>
-    </td>
-  </tr>
+```bash
+# Webhook 验证 token
+echo "$(openssl rand -hex 12)" | tee /opt/buildbot/masters/default/secrets_store/atomgit_webhook_token
 
-  <tr>
-    <td>auto-stats</td>
-    <td>
-      <ul>
-        <li>定时任务， corn 表达式是 `0 0 0 * * ?`（每天 0:00 执行一次）</li>
-      </ul>
-    </td>
-  </tr>
+# AtomGit API token
+echo "章节 2.5 里面的 ATOMGIT_TOKEN" | tee /opt/buildbot/masters/default/secrets_store/atomgit_token
 
-  <tr>
-    <td>auto-clear</td>
-    <td>
-      <ul>
-        <li>定时任务， corn 表达式是 `0 0 6 * * ?`（每天 6:00 执行一次）</li>
-      </ul>
-    </td>
-  </tr>
+# 华为云 AK/SK（OBS 上传需要）
+echo "章节 2.5 里面的 HUAWEICLOUD_SDK_AK" | tee /opt/buildbot/masters/default/secrets_store/huaweicloud_sdk_ak
+echo "章节 2.5 里面的 HUAWEICLOUD_SDK_SK" | tee /opt/buildbot/masters/default/secrets_store/huaweicloud_sdk_sk
 
-  <tr>
-    <td>auto-image</td>
-    <td>
-      <ul>
-        <li>不开启任何触发设置（也就是仅允许手动触发）</li>
-      </ul>
-    </td>
-  </tr>
-</table>
+# JWS 签名密钥（auto_merge 需要）
+echo "章节 2.5 里面的 JWS_SIGNING_KEY"    | tee /opt/buildbot/masters/default/secrets_store/jws_signing_key
+echo "章节 2.5 里面的 JWS_SIGNING_KEY_ID" | tee /opt/buildbot/masters/default/secrets_store/jws_signing_key_id
 
-## 10 搭建 webhook 过滤服务器
+# GitHub API token（auto_bump 需要）
+echo "章节 2.5 里面的 HOMEBREW_GITHUB_API_TOKEN" | tee /opt/buildbot/masters/default/secrets_store/homebrew_github_api_token
 
-1. 登陆 `webhook-filter` 服务器，直接在宿主机上安装 nginx、python 和所需的 pip 三方库。
-   ```sh
-   apt update
-   apt install -y nginx python3 python3-requests python3-fastapi python3-uvicorn
-   ```
-2. 创建 nginx 配置文件 `/etc/nginx/sites-available/webhook_filter.conf`
+# 统一设置密钥文件权限
+chmod 600 /opt/buildbot/masters/default/secrets_store/*
+```
 
-   ```
-   server {
-       listen 1234;            # 改成你实际想用的端口，配完后记得在 ECS 的安全组里面把对应端口放开
-       server_name 1.2.3.4;    # 改成你实际的公网 IP
+### 3.7 安装 systemd 服务并启动
 
-       location /v5/ {
-           proxy_pass http://127.0.0.1:8090;
-           proxy_set_header Host $host;
-           proxy_set_header X-Real-IP $remote_addr;
-           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-           proxy_set_header X-Forwarded-Proto $scheme;
+以 systemd 管理 Master 进程，支持开机自启和异常退出后自动重启。
 
-           # 建议做其他安全加固配置，例如 IP 白名单过滤等，这里不细讲
-       }
+```bash
+tee /etc/systemd/system/buildbot@.service << 'UNIT_EOF'
+[Unit]
+Description=Buildbot master %i
+After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=5m
 
-       # 其他路径返回 403
-       location / {
-           default_type text/plain;
-           return 403 "Access Denied.";
-       }
-   }
-   ```
+[Service]
+Type=simple
+User=buildbot
+Group=buildbot
+Environment="PATH=/opt/buildbot/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+WorkingDirectory=/opt/buildbot/masters/%i
+ExecStart=/opt/buildbot/.venv/bin/buildbot start --nodaemon
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=143
 
-3. 启用 nginx 服务
+[Install]
+WantedBy=multi-user.target
+UNIT_EOF
 
-   ```sh
-   # 创建软链接到 sites-enabled目录中
-   ln -s /etc/nginx/sites-available/webhook_filter.conf /etc/nginx/sites-enabled/
 
-   # 测试配置是否正确
-   nginx -t
+# 启动
+systemctl daemon-reload
+systemctl enable buildbot@default
+systemctl start buildbot@default
+```
 
-   # 重新加载 nginx 配置
-   systemctl reload nginx
-   ```
+### 3.8 验证 Master
 
-4. 在服务器上面的 /opt 目录放置 `webhook-filter.py`
-   ```sh
-   # 创建专用用户，命名为 filter
-   adduser --system --group --no-create-home filter
-   mkdir -p /opt/webhook_filter
-   curl -fsSL -o /opt/webhook_filter/webhook_filter.py https://raw.atomgit.com/Harmonybrew/ci/raw/main/src/webhook_filter.py
-   chown -R filter:filter /opt/webhook_filter
-   ```
-5. 创建 systemd 配置文件 `/etc/systemd/system/webhook-filter.service`
+```bash
+systemctl status buildbot@default
+tail -f /opt/buildbot/masters/default/twistd.log
+```
 
-   ```sh
-   [Unit]
-   Description=AtomGit Webhook Filter for CodeArts
-   After=network.target
+## 4 配置 Worker
 
-   [Service]
-   Type=simple
-   # 以 filter 用户权限运行
-   User=filter
-   WorkingDirectory=/opt/webhook_filter
-   # 启动命令
-   ExecStart=/usr/bin/python3 /opt/webhook_filter/webhook_filter.py
-   # 崩溃自动重启
-   Restart=on-failure
-   RestartSec=10
-   # 日志走 journald
-   StandardOutput=journal
-   StandardError=journal
-   SyslogIdentifier=webhook-filter
+Worker 是执行构建任务的节点，接收 Master 下发的命令执行。以下命令在 Worker 所在机器上执行。
 
-   [Install]
-   WantedBy=multi-user.target
-   ```
+### 4.1 创建系统用户和虚拟环境
 
-6. 启动 systemd 服务
-   ```sh
-   # 重载 systemd 配置
-   systemctl daemon-reload
-   # 启用开机自启
-   systemctl enable webhook-filter.service
-   # 立即启动
-   systemctl start webhook-filter.service
-   ```
+> 如果 Worker 和 Master 在同一台机器上，系统用户和虚拟环境已创建，跳到 4.2。
 
-## 11 对接 webhook
+在 Worker 所在机器上执行：
 
-1. 在 CodeArts 服务的工作台，找到左侧菜单的 “持续交付”-“流水线”，点进去。
-2. 点开 `auto-bottle` 这条流水线，点上方菜单“触发设置”，复制 webhoook 触发 URL。记录下来，并把 URL 里面的域名替换成 `<过滤服务器的公网 IP>:<过滤服务器的端口>`，协议从 https 换成 http。这个改好的 URL 后面会用到。
-3. 进入 homebrew-core 仓库的 webhook 配置页面，点右上角“新建 WebHook”。
-4. 把你改造过的 URL 填进去，WebhooK 密码留空，勾选“Pull Request 事件”和“激活”，最后保存。
+```bash
+# 创建 buildbot 系统用户
+useradd -r -s /bin/bash -d /opt/buildbot -m buildbot
+passwd -l buildbot
 
-## 12 构建第一个 ci-runner 镜像
+# 安装 Python 虚拟环境
+mkdir -p /opt/buildbot/workers
+python3 -m venv /opt/buildbot/.venv
+/opt/buildbot/.venv/bin/pip install buildbot-worker
+# 设置目录权限
+chown -R buildbot:buildbot /opt/buildbot/
+```
 
-构建第一个镜像之前需要在执行机上面进行一次手工运维操作：
+### 4.2 创建 Worker 实例
 
-1. 打开 SWR 控制台，点右上角“客户端上传”。
-2. 生成登陆指令。
-3. 把 AK/SK 填进去，生成长期有效指令。
-4. 把指令粘贴到 image-builder 这台服务器里面执行.
-5. 进入 CodeArts 页面，手动触发一次 auto-image 流水线。构建完成后，可以在 SWR 里面看到镜像了，不过第一次构建出来的镜像默认是私有的。
-6. 在 SWR 里面，点开镜像的详情页面，点击右上角的“...”，然后“编辑”，设置成公开。
+`create-worker` 生成 Worker 骨架，`buildbot.tac` 中记录 Master 地址和认证信息。
 
-## 13 调整 CDN 缓存配置
+```bash
+worker=<WORKER_NAME>
+worker_password=<YOUR_WORKER_PASSWORD>
+master_ip=<MASTER_IP>
 
-华为云 CDN 默认会把文件缓存，有效期是 90 天，文件一旦缓存起来它就不会再去 OBS 拿新文件了。
+mkdir -p /opt/buildbot/workers/${worker:?}
+/opt/buildbot/.venv/bin/buildbot-worker create-worker \
+    /opt/buildbot/workers/${worker:?} \
+    ${master_ip:?}:9989 \
+    ${worker:?} \
+    ${worker_password:?}
 
-在我们的 OBS 桶中，有一类文件是包索引文件，这些文件需要频繁更新，所以要手动调整缓存配置。
+# 设置目录权限
+chown -R buildbot:buildbot /opt/buildbot/workers/
+```
 
-在 CDN 控制台里面找到“缓存配置”进行配置，缓存规则如下：
+- worker 的名称 <WORKER_NAME>（即 master.cfg 文件定义的四个 worker 之一：worker1/worker2/worker3/worker4） 和密码 <YOUR_WORKER_PASSWORD> 要与 master.cfg 文件里的保持一致。
+- <MASTER_IP> 即第 3 章部署 master 填充的 YOUR_PUBLIC_IP，如果 worker 与 master 有局域网连接，就直接使用 master 的局域网 ip。
 
-- /api：包索引缓存 10 分钟
-- 默认规则：默认值 30 天不做改动
+### 4.3 写入 Worker 信息
 
-## 14 部署完成
+```bash
+echo "admin@example.com" > /opt/buildbot/workers/${worker:?}/info/admin
+echo "$(hostname)"       > /opt/buildbot/workers/${worker:?}/info/host
+```
 
-部署完成，可以开始正常使用流水线了。
+> Web UI 展示 worker 信息时包含这里的 admin 和 host。
+
+### 4.4 安装 systemd 服务并启动
+
+以 systemd 管理 Worker 进程，支持开机自启和异常退出后自动重启。
+
+```bash
+tee /etc/systemd/system/buildbot-worker@.service << 'UNIT_EOF'
+[Unit]
+Description=Buildbot worker %i
+After=network.target
+StartLimitBurst=5
+StartLimitIntervalSec=5m
+
+[Service]
+Type=simple
+User=buildbot
+Group=buildbot
+Environment="PATH=/opt/buildbot/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+WorkingDirectory=/opt/buildbot/workers/%i
+ExecStart=/opt/buildbot/.venv/bin/buildbot-worker start --nodaemon
+Restart=on-failure
+RestartSec=10
+SuccessExitStatus=143
+
+[Install]
+WantedBy=multi-user.target
+UNIT_EOF
+
+
+systemctl daemon-reload
+systemctl enable buildbot-worker@${worker:?}
+systemctl start buildbot-worker@${worker:?}
+```
+
+### 4.5 添加 Docker 支持
+
+Worker 上执行 Docker 构建需要将 `buildbot` 用户加入 `docker` 组，并重启 worker 服务生效：
+
+```bash
+usermod -aG docker buildbot
+systemctl restart buildbot-worker@${worker:?}
+```
+
+### 4.6 验证 Worker
+
+```bash
+systemctl status buildbot-worker@${worker:?}
+tail -f /opt/buildbot/workers/${worker:?}/twistd.log
+```
+
+Master 上确认连接：
+
+```bash
+grep "attached" /opt/buildbot/masters/default/twistd.log
+```
+
+## 5 配置 nginx 反向代理
+
+Buildbot Master 监听内部端口 18010，nginx 对外暴露 8010。可结合云服务器安全组限制 Web UI 请求来源。Webhook 路径和 Web UI 共用同一端口。
+
+### 5.1 写入 buildbot.conf
+
+nginx 反向代理配置：将外部 8010 端口转发到 Buildbot 内部 18010，并支持 WebSocket 升级。
+
+```bash
+tee /etc/nginx/conf.d/buildbot.conf << 'NGINX_EOF'
+# /etc/nginx/conf.d/buildbot.conf
+server {
+    # 监听端口（对外暴露的端口）
+    listen 8010;
+
+    # 如果你的 Buildbot 要通过域名访问，把 _ 改成你的域名
+    # 如果想暂时用 IP 访问，保留 _ 或写公网 IP
+    server_name _;
+
+    # ========== 主站点代理 ==========
+    location / {
+        proxy_pass http://127.0.0.1:18010;
+
+        # --- 基础代理头（必选） ---
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # --- WebSocket 支持（对普通请求无害） ---
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+
+        # --- 超时设置（WebSocket 长连接必备） ---
+        proxy_connect_timeout 60s;
+        proxy_send_timeout 60s;
+        proxy_read_timeout 3600s;  # WebSocket 空闲连接保持 1 小时
+
+        # --- 缓冲控制（Buildbot 实时日志需要禁用缓冲） ---
+        proxy_buffering off;
+        proxy_cache off;
+    }
+
+    # ========== 静态资源缓存优化（可选） ==========
+    location ~* \.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://127.0.0.1:18010;
+        proxy_set_header Host $host;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+
+    # ========== 健康检查端点（可选） ==========
+    location /health {
+        proxy_pass http://127.0.0.1:18010/health;
+        access_log off;
+    }
+}
+NGINX_EOF
+```
+
+### 5.2 加载 nginx 配置并启动
+
+检查配置语法后，根据 nginx 是否已运行选择热重载或安装启动。
+
+**如果已有 nginx 运行中：**
+
+```bash
+# 检查新增配置语法
+nginx -t
+
+# 热重载（不中断现有服务）
+nginx -s reload
+```
+
+**如果未安装 nginx：**
+
+```bash
+# 安装
+apt install nginx -y
+
+# 启动
+systemctl enable nginx
+systemctl start nginx
+```
+
+> IP 白名单由云服务器安全组控制，或修改 `location /` 添加 `allow / deny`。
+
+## 6 对接 Webhook
+
+Webhook URL：`http://1.2.3.4:8010/change_hook/atomgit?token=你的token` ，1.2.3.4 改成master公网ip，此处的 token 即在 secrets_store 目录写入的 atomgit_webhook_token
+
+将以上 URL 写入 homebrew-core 仓库的 Webhook URL。
+
+webhook 测试：
+
+```bash
+curl -v -X POST "http://1.2.3.4:8010/change_hook/atomgit?token=你的token&dry_run=1" \
+  -H "Content-Type: application/json" \
+  -d '{"event_type":"merge_request","user":{"name":"test"},"project":{"name":"test"},"repository":{"homepage":"http://example.com"},"object_attributes":{"title":"test","url":"http://example.com"}}'
+```
+
+> 该命令不实际触发流水线，正常返回码为 200。
+
+## 7 后续修改配置
+
+Master 配置修改后（如 master.cfg、atomgit_webhook.py），视情况进行热重载或重启：
+
+```bash
+# 验证语法正确
+/opt/buildbot/.venv/bin/buildbot checkconfig /opt/buildbot/masters/default/master.cfg
+
+# 仅 master.cfg 变化 → 热重载（不中断构建）
+systemctl reload buildbot@default
+
+# atomgit_webhook.py 有变化或添加了新的密钥文件 → 必须重启（执行中的构建会直接停止）
+systemctl restart buildbot@default
+```
+
+Worker 配置（buildbot.tac）修改后：
+
+```bash
+systemctl restart buildbot-worker@worker1
+```
+
+## 8 快速排查
+
+| 症状              | 检查                                                                                                                   |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Master 启动失败   | `tail /opt/buildbot/masters/default/twistd.log`；常见：语法错误、端口占用、密钥权限不是 600                            |
+| Worker 连接失败   | Worker 日志 `tail /opt/buildbot/workers/worker1/twistd.log`；核对 Master IP、端口 9989、Worker 名称和密码              |
+| Webhook 不触发    | `?token=` 是否匹配 `secrets_store/atomgit_webhook_token`；event_type 是否为 `merge_request`；label 是否为 `request-ci` |
+| Webhook 403       | secrets_store/* 文件权限是否为 600                                                                                     |
+| Web UI 登录后空白 | `authz` 只能用 `AnyControlEndpointMatcher`，不能用 `AnyEndpointMatcher`                                                |
+| Web UI 连接超时   | `buildbotURL` 和 `allowed_origins` 必须是公网 IP（nginx 对外端口 8010）；nginx 是否已启动                              |
+| 配置不生效        | Master 重启用 `restart` 而非 `reload`                                                                                  |

@@ -115,8 +115,8 @@ unset LD_PRELOAD
 # 验证编出来的 gzip 是否能正常运行
 $PREFIX/bin/gzip --help
 
-# 清理工作目录（临时目录无需手动清理，那个目录承载在 tmpfs 文件系统上）
-rm -rf $WORKDIR
+# 清理临时目录和工作目录
+sh -c "rm -rf $TMPDIR/* $WORKDIR/*"
 ```
 
 ### 场景二：编译 Rust 程序
