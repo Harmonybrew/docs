@@ -204,7 +204,7 @@ Homebrew 深度依赖 git。如果它检测到你的机器上有已安装的 git
 
 ```sh
 mkdir upstream downstream
-git clone --depth 1 -b 6.0.6 https://github.com/Homebrew/brew.git upstream/brew
+git clone --depth 1 -b 6.0.21 https://github.com/Homebrew/brew.git upstream/brew
 git clone --depth 1 https://atomgit.com/Harmonybrew/brew.git downstream/brew
 diff -ruN -x ".git" --no-dereference upstream/brew downstream/brew > out.diff
 vim out.diff
