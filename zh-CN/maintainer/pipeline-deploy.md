@@ -154,19 +154,20 @@ chown -R buildbot:buildbot /opt/buildbot/
 /opt/buildbot/.venv/bin/buildbot create-master /opt/buildbot/masters/default
 ```
 
-### 3.4 写入 master.cfg
-
-下载 master.cfg 模板文件
+### 3.4 下载配置文件模板
 
 ```bash
+curl -fsSL -o /opt/buildbot/masters/default/priorities.py https://raw.gitcode.com/Harmonybrew/ci/raw/main/buildbot/priorities.py
+curl -fsSL -o /opt/buildbot/masters/default/rules.py https://raw.gitcode.com/Harmonybrew/ci/raw/main/buildbot/rules.py
+# 包含 Master 核心配置： Worker、Scheduler、Builder、Web UI 等等。
 curl -fsSL -o /opt/buildbot/masters/default/master.cfg https://raw.gitcode.com/Harmonybrew/ci/raw/main/buildbot/master.cfg
+# 该文件是自定义 Webhook Handler，用于解析 AtomGit merge_request 事件并过滤后注入 Buildbot Change。
+curl -fsSL -o /opt/buildbot/masters/default/atomgit_webhook.py https://raw.gitcode.com/Harmonybrew/ci/raw/main/buildbot/atomgit_webhook.py
 ```
 
-Master 核心配置包含 Worker、Scheduler、Builder 工厂、Web UI 等。
+### 3.5 填充 master.cfg
 
-**填充模板**
-
-将模板文件占位符用实际值进行填充，其中的密码用 `openssl rand` 命令生成。
+将模板文件 master.cfg 中的占位符用实际值进行填充，其中的密码用 `openssl rand` 命令生成。
 
 ```bash
 worker_password=$(openssl rand -base64 14)
@@ -188,14 +189,6 @@ sed -i "s/YOUR_SWR_REGION/cn-north-4/g" /opt/buildbot/masters/default/master.cfg
 
 # 将占位符 YOUR_SWR_ORGANIZATION 替换成章节 2.5 里面的 SWR_ORGANIZATION，这里假设这个值为 harmonybrew
 sed -i "s/YOUR_SWR_ORGANIZATION/harmonybrew/g" /opt/buildbot/masters/default/master.cfg
-```
-
-### 3.5 写入 atomgit_webhook.py
-
-该文件是自定义 Webhook Handler，用于解析 AtomGit merge_request 事件并过滤后注入 Buildbot Change。
-
-```bash
-curl -fsSL -o /opt/buildbot/masters/default/atomgit_webhook.py https://raw.gitcode.com/Harmonybrew/ci/raw/main/buildbot/atomgit_webhook.py
 ```
 
 ### 3.6 填写 secrets_store 中的密钥
