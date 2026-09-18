@@ -75,14 +75,19 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
 
 ### 场景一：编译 C/C++ 程序
 
-在鸿蒙 PC 上编译传统的 C/C++ 开源软件（如 gzip 等）时，通常会面临一个问题：许多开源软件的构建脚本无法识别 OpenHarmony 特有的系统标识，导致配置或编译失败。
+Harmonybrew 核心仓库中有 3 套 C/C++ 编译工具链：
+1. ohos-sdk：里面的 LLVM 15 由 OpenHarmony 社区进行深度适配，是 OpenHarmony 生态的官方工具链。
+2. llvm + lld：由 Harmonybrew 社区移植。在 Homebrew 生态中，lld 被拆分成独立的软件包，不在 llvm 主包中。
+3. gcc + binutils：由 Harmonybrew 社区移植。
 
-为了对齐传统的 Linux 编译体验，Harmonybrew 提供了 uname-is-linux 伪装工具，通过劫持系统调用将系统标识伪装为 Linux，从而让各种开源软件能够无缝完成构建。
+<br>
 
-在鸿蒙 PC 的 HiShell 环境中编译开源软件 gzip 的完整流程如下：
+我们首推的编译工具链是 ohos-sdk，本文档仅基于 ohos-sdk 进行演示。如果你需要使用其他工具链，请自行探索。需要注意：这 3 套工具链的产物不能互相链接，也不能在同一进程内混用，否则极易因运行时库冲突引发隐蔽崩溃。
+
+以下是一个在 HiShell 环境中使用 ohos-sdk 搭配辅助包（llvm-gcc-compat、uname-is-linux）编译开源软件 gzip 的示例：
 
 ```sh
-# 安装编译工具链和环境伪装工具
+# 安装编译工具链和环境伪装工具（ohos-sdk 和 llvm-gcc-compat 会作为级联依赖被自动引入）
 brew install -y devel-base uname-is-linux
 
 # HiShell 环境中，TMPDIR 环境变量的默认值是 /storage/Users/currentUser，这个目录承载在 hmdfs 上
