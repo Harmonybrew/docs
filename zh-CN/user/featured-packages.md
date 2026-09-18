@@ -75,7 +75,7 @@ Harmonybrew 本该只负责包管理，但为了让大家能顺利地在 OpenHar
 
 ### 场景一：编译 C/C++ 程序
 
-Harmonybrew 核心仓库中有 3 套 C/C++ 编译工具链：
+Harmonybrew 软件仓库中有 3 套 C/C++ 编译工具链：
 1. ohos-sdk：里面的 LLVM 15 由 OpenHarmony 社区进行深度适配，是 OpenHarmony 生态的官方工具链。
 2. llvm + lld：由 Harmonybrew 社区移植。在 Homebrew 生态中，lld 被拆分成独立的软件包，不在 llvm 主包中。
 3. gcc + binutils：由 Harmonybrew 社区移植。
