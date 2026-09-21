@@ -118,6 +118,10 @@ CDN 加速域名配置完成之后，把你的 SSL 证书也部署到 CDN 上，
       <td>SWR_ORGANIZATION</td>
       <td>在上面的步骤已经创建过 SWR 组织，请把所属 Region 记录下来。</td>
     </tr>
+    <tr>
+      <td>DEEPSEEK_API_KEY/td>
+      <td>前往 DeepSeek 开放平台创建</td>
+    </tr>
   </tbody>
 </table>
 
@@ -221,6 +225,9 @@ echo "章节 2.5 里面的 JWS_SIGNING_KEY_ID" | tee /opt/buildbot/masters/defau
 # GitHub API token（auto_bump 需要）
 echo "章节 2.5 里面的 HOMEBREW_GITHUB_API_TOKEN" | tee /opt/buildbot/masters/default/secrets_store/homebrew_github_api_token
 
+# DeepSeek API key（ai-bump 需要）
+echo "章节 2.5 里面的 DEEPSEEK_API_KEY" | tee /opt/buildbot/masters/default/secrets_store/deepseek_api_key
+
 # 统一设置密钥文件权限
 chmod 600 /opt/buildbot/masters/default/secrets_store/*
 ```
@@ -285,7 +292,10 @@ passwd -l buildbot
 # 安装 Python 虚拟环境
 mkdir -p /opt/buildbot/workers
 python3 -m venv /opt/buildbot/.venv
-/opt/buildbot/.venv/bin/pip install buildbot-worker
+
+# 除了 buildbot-worker 以外，需要额外安装 requests，ai-bump 流水线要用到 
+/opt/buildbot/.venv/bin/pip install buildbot-worker requests
+
 # 设置目录权限
 chown -R buildbot:buildbot /opt/buildbot/
 ```
