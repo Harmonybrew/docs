@@ -204,7 +204,7 @@ Homebrew 深度依赖 git。如果它检测到你的机器上有已安装的 git
 
 ```sh
 mkdir upstream downstream
-git clone --depth 1 -b 6.0.21 https://github.com/Homebrew/brew.git upstream/brew
+git clone --depth 1 -b 7.0.6 https://github.com/Homebrew/brew.git upstream/brew
 git clone --depth 1 https://atomgit.com/Harmonybrew/brew.git downstream/brew
 diff -ruN -x ".git" --no-dereference upstream/brew downstream/brew > out.diff
 vim out.diff
@@ -339,7 +339,9 @@ Homebrew 并非我们的唯一路径。目前，@hqzing 已同步完成了 pkgsr
 
 ## 如何访问流水线？
 
-本项目使用华为云 CodeArts Pipeline 负责 CI/CD 任务。由于平台权限限制，流水线后台目前无法直接对公众开放，但我们通过以下方式确保流程的透明与公开：
+Harmonybrew 使用自部署的开源流水线系统 [Buildbot](https://github.com/buildbot/buildbot) 来承载核心 CI 任务。
+
+出于安全考虑，我们没有将流水线 Web UI 向公网开放，但我们通过以下方式确保流程的透明与公开：
 
 - **实时反馈：** 我们通过 Webhook 实现了代码仓与流水线的联动。当您提交 PR 后，机器人会将运行日志自动同步至 PR 讨论区，您可以直接在评论区查看构建结果。
 - **逻辑公开：** 流水线的核心业务逻辑并非“黑盒”。所有构建脚本与配置代码均在 [Harmonybrew/ci](https://atomgit.com/Harmonybrew/ci) 仓库开源，任何人都可以审计或参考我们的 CI 流程。
