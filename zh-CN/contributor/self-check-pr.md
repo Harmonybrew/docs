@@ -1,0 +1,98 @@
+# Pull Request 自查指南
+
+本文档是 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core) 仓库的 PR 自查指南。
+
+## 基础规范
+
+- 作用域单一：
+  - 一个 PR 不允许包含多个 commit。
+  - 一个 commit 不允许新增/修改多个 formula 文件。
+  - 一个 commit 不允许同时修复多个问题。
+
+- Commit Message 格式：
+  - 新增 formula: `<formula> <version> (new formula)`
+  - 版本升级: `<formula> <version>`
+  - 修复/增强：`<formula>: <action>`
+  - 修订版本升级：`<formula>: revision bump <reason>`
+
+- Commit 作者：
+  - Commit 作者必须是贡献者本人，禁止将作者写成 HarmonybrewBot。
+  - 在 Commit 列表里面点击贡献者的用户名，必须要能跳转到贡献者的 AtomGit 主页。这意味着贡献者需要将自己使用的 git 邮箱绑定到 AtomGit 平台中。操作入口在这里：<https://atomgit.com/setting/email>。
+
+- PR 标题：
+  - PR 标题与 Commit Message 保持一致，不允许自创格式。
+
+- PR 描述：
+  - 禁止使用自动化工具自动创建 PR。需手工创建 PR 并按照 PR 模板正确填写 PR 描述。手工创建 PR 时 AtomGit 平台会显示 PR 模板。
+  - PR 描述需真实、准确。不允许将“搬运上游已有的 formula”与“手写全新的 formula”两种情况进行混淆。未进行实际业务修改的情况下不允许写“鸿蒙适配”。
+
+- PR 数量：
+  - 每位用户最多只允许同时开启 4 个 PR。若有更多 PR 需要提交，需要等待当前 PR 合入后再进行处理。
+
+## 准入规则
+
+- 满足上游（Homebrew）的 [Acceptable-Formulae](https://docs.brew.sh/Acceptable-Formulae) 标准：
+  - 必须是开源软件
+  - 必须能从源码构建，禁止录入预构建的二进制文件
+  - 源代码必须来自这个开源软件的官方，不能使用第三方社区维护的 fork 版本
+  - 不能过于冷门
+  - ......
+
+- 满足下游（Harmonybrew）额外约束：
+  - 统一英文注释
+  - 遵循最小化修改原则
+  - 按需录入，禁止连续大批量录入软件包
+
+## 开发流程
+
+- 必须基于标准化的容器环境进行开发：
+  - 必须基于 Harmonybrew 提供的标准化容器 ci-runner 进行开发。禁止在鸿蒙 PC 原生环境上开发。禁止自行构造鸿蒙容器。
+  - 禁止直接将鸿蒙 PC 原生环境上的手工构建参数和适配补丁直接搬运到 formula 中（此举极易引入冗余修改）。需要基于标准化容器 ci-runner 从零开展适配工作。
+  - 禁止将交叉编译环境上的手工构建参数和适配补丁直接搬运到 formula 中（此举极易引入冗余修改）。需要基于标准化容器 ci-runner 从零开展适配工作。
+
+- 软件包必须通过 Homebrew 的构建系统进行构建：
+  - 禁止在 ci-runner 中先手工构建再改写成 formula（此举极易引入冗余修改）。必须全程以 brew install -s 的方式进行源码构建。
+
+- 开展工作前需要对环境进行更新：
+  - 每一轮工作前需要先执行 `docker pull swr.cn-north-4.myhuaweicloud.com/harmonybrew/ci-runner:latest` 检查镜像是否存在更新。
+  - 每一轮工作前需要创建新的 ci-runner 容器，禁止复用上一轮工作残留的容器。
+  - 每一轮工作前需要执行 `brew update` 更新核心 tap 仓库。
+
+## 改动点审查
+
+- 必备的审查动作：
+  - 如果开源软件在上游 Homebrew/homebrew-core 中已存在，必须直接搬运上游 formula，严禁从零手写。
+  - 无论是基于上游 formula 进行适配，还是在现有 formula 基础上修改，都需确保改动点达到最少，使 formula 文件尽可能接近它在上游 Homebrew/homebrew-core 仓库中的状态。
+  - 如果是基于上游 formula 进行适配（Homebrew/homebrew-core 中存在，Harmonybrew/homebrew-core 尚未收录），提交 PR 前需要在本地将自己改过的 formula 与上游 Homebrew/homebrew-core 中的版本进行 diff，审查每一处变更的必要性。禁止引入冗余修改。
+  - 如果是现有 formula 基础上修改（Harmonybrew/homebrew-core 中已存在，需要进行修改），提交前需要仔细审查自己的改动点。禁止引入冗余修改。修改完业务代码后需要递增修订版本号。
+
+- 重点审视的冗余修改：
+  - 无意义的构建参数。例如 `-I#{formula_opt_include("openssl@4")`、`-L#{formula_opt_lib("openssl@4")`（只要声明了 `depends_on "openssl@4"`，Homebrew superenv 会自动将这些参数注入给编译器）。
+  - 无意义的环境变量。例如 `ENV["AR"] = "llvm-ar"`、`ENV.append_path "PATH", "/storage/Users/currentUser/.harmonybrew/bin"`（这些已经是 Homebrew superenv 的默认行为）。
+  - 无意义的级联依赖。例如 `depends_on "make" => :build`、`depends_on "perl" => :build`（这些是所有 formula 的隐式依赖，在 Homebrew 生态中，formula 从不显式声明这些依赖，Harmonybrew 的 ci-runner 也已经在系统目录下预置了这些软件）。
+  - 上游未启用、且并非鸿蒙适配所必须的构建参数。
+  - 只在构建期生效的鸿蒙内核（uname 标识为 HarmonyOS）适配项（Harmonybrew 的 formula 从来不会在鸿蒙内核上构建，此类适配为冗余修改）。
+
+- 被禁止的行为：
+  - 禁止改变 formula 在其他平台上的表现。在 formula 文件中，所有鸿蒙适配内容必须被 `if OS.ohos?` 或 `unless OS.ohos?` 保护，并提供配套注释，不允许直接修改全局路径或 Linux 路径。
+  - 禁止将上游补丁搬运至仓库中。如果 formula 在上游（Homebrew/homebrew-core）存在仓内补丁，录入时需要以远程补丁的方式引入，而不是将上游补丁复制一份提交到下游仓库。
+  - 禁止进行功能性修改。软件包的行为需要尽可能与上游（Homebrew/homebrew-core）里面的版本行为一致，禁止对软件包进行与鸿蒙适配无关的功能增强。
+  - 禁止将 [build_in_harmonyos](https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos) 项目的构建参数和补丁搬运至本仓库。这不仅会引入大量冗余修改（该项目构建环境与 ci-runner 不同），还可能引发版权纠纷（补丁版权归属于原组织）。
+  - 默认情况下禁止将 Homebrew/homebrew-core 以外的开源代码引入本仓库。不加声明地引入外来代码可能会将本项目置身于版权纠纷中。为避免增添无意义的维护工作量，只有贡献者本人自研（含 AI 自研）的代码和 0BSD、MIT-0 这两种许可证的外来代码被允许合入本仓库。
+  - 禁止人工修改 formula 文件内的 bottle 块。无论是基于上游 formula 进行适配，还是在现有 formula 基础上修改，都需要将 bottle 块保持原样。
+  - 在注释和 Commit Message 中默认禁止使用 HarmonyOS 这个词汇。只有两种情况可以使用这个词汇：1. 你解决的问题是 HarmonyOS 这个发行版特有的（例如鸿蒙内核相关问题）；2. 你需要特指华为鸿蒙 PC（HarmonyOS PC）这个设备。其他情况应使用 OpenHarmony 或其简称 OHOS。注意：应用沙箱和 hmdfs 并非 HarmonyOS 这个发行版特有，这些机制在 OpenHarmony 中同样有实现。
+
+## 例外声明
+
+以上限制仅针对常规场景，并非所有 PR 都会遵循：
+- 维护者出于维护工作需求可能需要主动违反规则。例如在大批量维护软件包时可能会同时提交上千个 PR。
+- 某些软件包可能存在特殊原因需要违反其中的规则。作者可在 PR 描述或 PR 讨论区中与维护者沟通，维护者会视情况例外放行。注意，“特殊”的门槛很高，请不要轻易认为自己特殊。
+
+## 限制措施
+
+为维护大多数用户及贡献者、维护者的利益，本社区设置了以下限制措施：
+- 同时提交 5 个及以上 PR 的行为，视为恶意刷屏。恶意刷屏的用户会被维护者加入黑名单。黑名单用户无法再往本组织内提交 PR、提交 Issue 或发表评论。用户被加入黑名单后，需要发邮件向维护者澄清原由并给出整改方案后才会移出黑名单。
+- 如果一个 PR 问题过多，质量已经低到不具备纠正的价值，维护者会主动忽略它，不会在上面花费时间，不会给出任何检视意见。如果一个 PR 提交一个月后既没有被合并也未得到任何检视意见，大概率就属于这种情况。如果遇到这种情况，贡献者应直接关闭这个 PR，重新提交一个更合格的 PR。
+- 维护者只与有血有肉的贡献者进行沟通，不与“AI 的传话筒”沟通。若一个 PR 很明显能看出来全程由 AI 完成（所有代码和文案全部由 AI 生成，注释和 PR 描述中充斥大量过程性信息，甚至连 PR 本身都由 AI 提交），没有任何人工把关的痕迹，维护者同样会将其视作低质量 PR，同样会主动忽略它。
+- 对于反复多次指导仍未正确整改的 PR，维护者会刻意延长检视周期，通常会延长到 15 天以上。请贡献者珍惜每一次检视的机会，切勿将维护者当做自己的试错工具。
+- 对于为 Harmonybrew 制造合规风险的用户（不加声明地引入可能导致版权纠纷的外来代码），一经发现直接加入黑名单，不会移出。本社区不会再接受此用户的贡献。
