@@ -74,7 +74,7 @@
   - 只在构建期生效的鸿蒙内核（uname 标识为 HarmonyOS）适配项（Harmonybrew 的 formula 从来不会在鸿蒙内核上构建，此类适配为冗余修改）。
 
 - 被禁止的行为：
-  - 禁止改变 formula 在其他平台上的表现。在 formula 文件中，所有鸿蒙适配内容必须被 `if OS.ohos?` 或 `unless OS.ohos?` 保护，并提供配套注释，不允许直接修改全局路径或 Linux 路径。
+  - 禁止改变 formula 在其他平台上的表现。在 formula 文件中，所有鸿蒙适配内容必须被 `if OS.ohos?` 或 `unless OS.ohos?` 保护（包括 `patch do`），并提供配套注释，不允许直接修改全局路径或 Linux 路径。
   - 禁止将上游补丁搬运至仓库中。如果 formula 在上游（Homebrew/homebrew-core）存在仓内补丁，录入时需要以远程补丁的方式引入，而不是将上游补丁复制一份提交到下游仓库。
   - 禁止进行功能性修改。软件包的行为需要尽可能与上游（Homebrew/homebrew-core）里面的版本行为一致，禁止对软件包进行与鸿蒙适配无关的功能增强。
   - 禁止将 [build_in_harmonyos](https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos) 项目的构建参数和补丁搬运至本仓库。这不仅会引入大量冗余修改（该项目构建环境与 ci-runner 不同），还可能引发版权纠纷（补丁版权归属于原组织）。
