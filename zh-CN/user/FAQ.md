@@ -384,24 +384,19 @@ Harmonybrew 作为一个由社区发起的开源项目，在商用支持与责�
 
 ## 是否能支持其他架构？
 
-目前 Harmonybrew 仅原生支持 arm64 架构，且暂无主动适配其他架构的计划。
+目前 Harmonybrew 仅原生支持 arm64 架构，且无主动适配其他架构的计划。
 
-若相关硬件厂商或社区组织有强烈意愿将特定架构（如 x86_64）融入本社区生态，我们持开放合作态度，但合作方需具备独立承担**工程适配**与**运行成本**的能力。
+要让一个新架构得到 Harmonybrew 官方支持，这是一件很困难的事情。这并不是一项单纯的编程工作，它还涉及到云资源费用等问题，并非提交几个 PR 就能实现。请不要尝试去挑战这个目标。我们不会接受任何企图新增架构的 PR。
 
-新增架构的准入需完成以下工作：
+如果你使用的是 x86_64 架构的 OpenHarmony 系统（包括 KaihongOS 等下游发行版），请直接使用原版 Homebrew，不需要使用 Harmonybrew。
 
-- **构建环境适配**：
-  - **鸿蒙容器**：对 [DockerHarmony](https://github.com/hqzing/dockerharmony) 项目进行 fork 并迭代升级，使其能通过 `docker buildx` 构建多架构镜像（包含目标架构），将改动回馈至上游。
-  - **原生编译工具链**：提供可在目标架构原生运行的 ohos-sdk。出于构建质量考虑，我们的流水线仅接受原生编译，不接受交叉编译方案。
-  - **流水线镜像**：对 [Harmonybrew/ci](https://atomgit.com/Harmonybrew/ci) 项目进行 fork 并迭代升级，使其 ci-runner 能通过 `docker buildx` 构建多架构镜像（包含目标架构），将改动回馈至上游。
-- **流水线工程改造**：
-  - **脚本兼容性**：对 [Harmonybrew/ci](https://atomgit.com/Harmonybrew/ci) 项目进行 fork 并迭代升级，使流水线能够支持多架构 Bottle 的并行构建与分发，将改动回馈至上游。
-- **持续的资源投入**：
-  - **硬件与流量成本**：合作方需承担因新增架构产生的额外构建机开销及 CDN 下行流量成本。
-- **长期维护承诺**：
-  - **测试与排障**：合作方需指派专人维护 Formula 的架构兼容性。若某软件包在 arm64 上通过但在新增架构上失败，合作方有义务及时修复，严禁因架构差异长期阻塞社区 PR 的合入流程。
+Homebrew 在 Linux 系统上为了做到跨发行版可用，它自包含了 glibc，并将仓库中的所有 Linux 软件包都链接到自包含的 glibc 中，完全不使用系统的 libc。
 
-如果您能满足上述所有条件并希望发起合作，可通过邮件与我们联系。
+这意味着，理论上 Homebrew 包管理器和软件仓库中的软件包可以运行在任何使用 Linux 内核的设备上，完全不关注设备上使用的是什么用户态，只要 bash、git 等外部命令行工具满足要求即可。当前普通消费者能获取到的 OpenHarmony x86_64 标准系统设备全部使用 Linux 内核，并不存在鸿蒙内核这样的特例。因此你可以放心地在上面运行 Homebrew 提供的 glibc 和海量 Linux 软件包。
+
+虽然 Homebrew 对用户态不敏感，但在 OpenHarmony x86_64 系统中，一些 Linux 软件包可能会因应用沙箱等限制而无法正常工作。这种情况下，只需要用 Homebrew 为它打规避补丁、重新构建 bottle 即可，不需要为此专门引入一套沉重的 Harmonybrew。Harmonybrew 项目为了能同时照顾到鸿蒙内核，才把方案做得这么复杂。对于只考虑 Linux 内核的场景，事情可以变得很简单。
+
+顺便提供个扩展知识：自包含 glibc 的包管理系统并不只有 Homebrew，例如 Nix 也是如此。你也可以尝试在 OpenHarmony x86_64 设备上使用 Nix 包管理器及其软件仓库中的 Linux 软件包。总之，在 OpenHarmony x86_64 设备上，可选择的包管理方案很多，不必执着于 Harmonybrew。
 
 <div id="contribute-to-upstream"></div>
 
