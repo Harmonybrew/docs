@@ -189,9 +189,32 @@ brew test sevenzip
 - 如果 formula 里面本身已经有 `revision ***`，你需要把数字加一。
 - 如果 formula 里面还没有 `revision ***`，你需要给它添加 `revision 1`。写法可参考现有的其他 formula。
 
-## 5 提交 PR
+## 5 多设备验证
 
-### 5.1 配置 SSH 密钥对
+这一步是可选步骤。如果你的修改点只能在鸿蒙 PC 真机上完成验证，你就需要做这一步。
+
+首先在 ci-runner 中将 formula 打包成 bottle：
+
+```sh
+brew install -y -v --build-bottle <formula>
+brew bottle --skip-relocation <formula>
+```
+
+将压缩包下载到鸿蒙 PC 上，使用 `brew install` 离线安装这个压缩包：
+```sh
+HOMEBREW_DEVELOPER=1 brew install <path-to-tarball>
+```
+
+现在你可以开展你的验证工作。
+
+验证完成后，使用 `brew uninstall` 正常卸载：
+```sh
+brew uninstall <formula>
+```
+
+## 6 提交 PR
+
+### 6.1 配置 SSH 密钥对
 
 为了能够推送代码，需生成 SSH 密钥并将其公钥录入 [AtomGit 设置中心](https://atomgit.com/setting/key-ssh)。
 
@@ -203,7 +226,7 @@ ssh-keygen -t ed25519
 cat ~/.ssh/id_ed25519.pub
 ```
 
-### 5.2 推送代码至个人仓库
+### 6.2 推送代码至个人仓库
 
 如果你尚未 fork 过 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core)，请先进行 fork。
 
@@ -246,11 +269,11 @@ git push my-fork main:sevenzip
 - 一个 commit 不允许新增/修改多个 formula 文件，只允许新增/修改单个 formula 文件及其关联资源（Patches、Aliases 等）。
 - 如果你提 PR 是为了修复问题，还需要注意一个 commit 只能修复一个问题。
 
-### 5.3 代码自查
+### 6.3 代码自查
 
 在真正将 PR 提交到社区仓库之前，需要先按照 [Pull Request 自查指南](./self-check-pr.md) 对自己的代码进行自查，确保自己提交的是一个合格的 PR。
 
-### 5.4 提交 PR
+### 6.4 提交 PR
 
 去 AtomGit 网页上操作，从自己的个人仓往 [Harmonybrew/homebrew-core](https://atomgit.com/Harmonybrew/homebrew-core) 提交 PR。我们在仓库中设置了 PR 模板，提交 PR 时网页上会展示 PR 模板，你需要按照模板填写信息。
 
@@ -270,7 +293,7 @@ PR 被提交后，维护者需要进行对它进行评审。维护者为 PR 添�
 
 > **为什么要生成“替代 PR”**：因为 AtomGit 平台的能力相比于 GitHub 还是有所欠缺，并不支持设置 “Allow edits by maintainers”，而我们的业务非常依赖该特性（机器人在跑完流水线后需往 PR 中添加新的 commit）。在平台能力有限的情况下，只能通过这种妥协方式实现。
 
-## 6 进阶玩法：使用 AI Agent 进行 formula 适配
+## 7 进阶玩法：使用 AI Agent 进行 formula 适配
 
 如今的大模型能力已经相当强大，即使不预设任何知识库和技能集，它们自己也知道如何完成 formula 的鸿蒙适配。
 

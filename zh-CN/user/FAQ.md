@@ -204,7 +204,7 @@ Homebrew 深度依赖 git。如果它检测到你的机器上有已安装的 git
 
 ```sh
 mkdir upstream downstream
-git clone --depth 1 -b 7.0.6 https://github.com/Homebrew/brew.git upstream/brew
+git clone --depth 1 -b 7.0.9 https://github.com/Homebrew/brew.git upstream/brew
 git clone --depth 1 https://atomgit.com/Harmonybrew/brew.git downstream/brew
 diff -ruN -x ".git" --no-dereference upstream/brew downstream/brew > out.diff
 vim out.diff
@@ -388,15 +388,15 @@ Harmonybrew 作为一个由社区发起的开源项目，在商用支持与责�
 
 要让一个新架构得到 Harmonybrew 官方支持，这是一件很困难的事情。这并不是一项单纯的编程工作，它还涉及到云资源费用等问题，并非提交几个 PR 就能实现。请不要尝试去挑战这个目标。我们不会接受任何企图新增架构的 PR。
 
-如果你使用的是 x86_64 架构的 OpenHarmony 系统（包括 KaihongOS 等下游发行版），请直接使用原版 Homebrew，不需要使用 Harmonybrew。
+如果你使用的是 x86_64 架构的 OpenHarmony 系统（包括 KaihongOS 等下游发行版），建议尝试直接使用原版 Homebrew，而不是使用 Harmonybrew。
 
-Homebrew 在 Linux 系统上为了做到跨发行版可用，它自包含了 glibc，并将仓库中的所有 Linux 软件包都链接到自包含的 glibc 中，完全不使用系统的 libc。
+Homebrew 在 Linux 系统上为了做到跨发行版可用，它自包含了 glibc，并将仓库中的所有 Linux 软件包都链接到自包含的 glibc 垫片中。如果 Homebrew 检测到系统 glibc 能满足自己的要求，就会把垫片指向系统 glibc；如果系统 glibc 不满足自己的要求，就会把垫片指向自包含的 glibc，完全不使用系统的 glibc。因此它在 Alpine Linux 等 musl 系统和 Ubuntu 22.04 等旧版系统上都是可以正常工作的。
 
 这意味着，理论上 Homebrew 包管理器和软件仓库中的软件包可以运行在任何使用 Linux 内核的设备上，完全不关注设备上使用的是什么用户态，只要 bash、git 等外部命令行工具满足要求即可。当前普通消费者能获取到的 OpenHarmony x86_64 标准系统设备全部使用 Linux 内核，并不存在鸿蒙内核这样的特例。因此你可以放心地在上面运行 Homebrew 提供的 glibc 和海量 Linux 软件包。
 
-虽然 Homebrew 对用户态不敏感，但在 OpenHarmony x86_64 系统中，一些 Linux 软件包可能会因应用沙箱等限制而无法正常工作。这种情况下，只需要用 Homebrew 为它打规避补丁、重新构建 bottle 即可，不需要为此专门引入一套沉重的 Harmonybrew。Harmonybrew 项目为了能同时照顾到鸿蒙内核，才把方案做得这么复杂。对于只考虑 Linux 内核的场景，事情可以变得很简单。
+虽然 Homebrew 对用户态不敏感，但在 OpenHarmony x86_64 系统中，一些 Linux 软件包可能会因应用沙箱等限制而无法正常工作。这种情况下，只需要用 Homebrew 为它打规避补丁、重新构建 bottle 即可，不需要为此专门引入一套沉重的 Harmonybrew。Harmonybrew 项目为了能同时照顾到 HarmonyOS PC，才把方案做得这么复杂。对于只考虑 Linux 内核的场景，事情可以变得很简单。
 
-顺便提供个扩展知识：自包含 glibc 的包管理系统并不只有 Homebrew，例如 Nix 也是如此。你也可以尝试在 OpenHarmony x86_64 设备上使用 Nix 包管理器及其软件仓库中的 Linux 软件包。总之，在 OpenHarmony x86_64 设备上，可选择的包管理方案很多，不必执着于 Harmonybrew。
+顺便提供个扩展知识：自包含 glibc 的包管理系统并不只有 Homebrew，例如 Nix 也是如此。你同样可以尝试在 OpenHarmony x86_64 设备上使用 Nix 包管理器及其软件仓库中的 Linux 软件包。总之，在 OpenHarmony x86_64 设备上，可选择的包管理方案很多，不必执着于 Harmonybrew。
 
 <div id="contribute-to-upstream"></div>
 
