@@ -76,13 +76,13 @@ graph TD
 ```sh
 mkdir -p /opt/rathole/bin
 
-# x86 服务器下载 rathole-x86_64-unknown-linux-gnu.zip
+# Linux x86_64 环境：下载 GNU 版本
 curl -LO https://github.com/rathole-org/rathole/releases/download/v0.5.0/rathole-x86_64-unknown-linux-gnu.zip
 unzip rathole-x86_64-unknown-linux-gnu.zip
 mv rathole /opt/rathole/bin/rathole
 rm rathole-x86_64-unknown-linux-gnu.zip
 
-# arm 服务器下载 rathole-aarch64-unknown-linux-musl.zip（这个版本静态链接了 musl，它在 GNU 发行版上也能运行）
+# Linux aarch64 环境：下载 musl 静态链接版本（也适用于 GNU 发行版）
 curl -LO https://github.com/rathole-org/rathole/releases/download/v0.5.0/rathole-aarch64-unknown-linux-musl.zip
 unzip rathole-aarch64-unknown-linux-musl.zip
 mv rathole /opt/rathole/bin/rathole

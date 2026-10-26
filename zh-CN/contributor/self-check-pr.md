@@ -72,6 +72,7 @@
   - 无意义的级联依赖。例如 `depends_on "make" => :build`、`depends_on "perl" => :build`（这些是所有 formula 的隐式依赖，在 Homebrew 生态中，formula 从不显式声明这些依赖，Harmonybrew 的 ci-runner 也已经在系统目录下预置了这些软件）。
   - 上游未启用、且并非鸿蒙适配所必须的构建参数。
   - 只在构建期生效的鸿蒙内核（uname 标识为 HarmonyOS）适配项（Harmonybrew 的 formula 从来不会在鸿蒙内核上构建，此类适配为冗余修改）。
+  - 网络相关的规避措施。例如在 formula 文件中配置国内镜像站、删除需要联网的测试用例等。Harmonybrew 的 CI 服务器在香港区域，可以流畅访问任何国外网站，所有针对网络的规避措施都是冗余修改。
 
 - 被禁止的行为：
   - 禁止改变 formula 在其他平台上的表现。在 formula 文件中，所有鸿蒙适配内容必须被 `if OS.ohos?` 或 `unless OS.ohos?` 保护（包括 `patch do`），并提供配套注释，不允许直接修改全局路径或 Linux 路径。
