@@ -146,7 +146,7 @@ brew install -y -s -v --include-test sevenzip
 brew test sevenzip
 ```
 
-> **适配提示**：若上游 formula 在 OpenHarmony 环境下构建失败，可以尝试禁用不支持的可选功能，或制作专门的适配补丁。参考：[补丁制作指南](./make-patch.md)。
+> **适配提示**：若上游 formula 在 OpenHarmony 环境下构建失败，可以尝试禁用不支持的可选功能，或制作专门的适配补丁。参考：[补丁制作指南](./make-patch.md)、[Formula 适配最佳实践](./formula-best-practices.md)。
 
 **B. 手写全新的 formula**
 
@@ -342,12 +342,10 @@ PR 被提交后，维护者需要进行对它进行评审。维护者为 PR 添�
    https://raw.githubusercontent.com/Homebrew/homebrew-core/refs/heads/main/Formula/u/util-linux.rb
 
    注意事项：
-   1. 如果需要制作和引用补丁，写法可参考仓库中现有的 formula。例如需要对软件包自身源码打补丁可参考 gcc、cmake、perl；需要对 node_modules 打补丁可参考 deepseek-harness；需要对 Rust crate 打补丁可参考 codex、cc-switch-cli。
-   2. 如果需要在 C/C++ 源代码中添加条件编译宏，可使用 __OHOS__ 这个宏来作为判断条件，鸿蒙平台上的编译器会自动传入这个宏。
-   3. 这个 Homebrew 将 OpenHarmony 视为一个特殊的 Linux 的发行版，因为在编译器视角上 OpenHarmony 平台的目标三元组是 `<arch>-linux-ohos`。在 formula 中，`OS.linux?` 和 `OS.ohos?` 的返回值都是 true。如果产生了鸿蒙特有的适配项，你必须将改动点用 `if OS.ohos?` 或 `unless OS.ohos?` 保护起来，并提供配套注释，不要让它影响 Linux 路径或全局路径。
-   4. 改完代码后需要根据这些文档进行自查：
+   - 开始修改前，先阅读并遵循以下文档：
      - https://raw.atomgit.com/Harmonybrew/docs/raw/main/zh-CN/contributor/contribute-formula.md
-     - https://raw.atomgit.com/Harmonybrew/docs/raw/main/zh-CN/contributor/self-check-pr.md。
-   5. 禁止推送代码和创建 PR，这些动作必须由人类完成。
+     - https://raw.atomgit.com/Harmonybrew/docs/raw/main/zh-CN/contributor/self-check-pr.md
+     - https://raw.atomgit.com/Harmonybrew/docs/raw/main/zh-CN/contributor/formula-best-practices.md
+   - 修改完成后，再按照 self-check-pr 和 formula-best-practices 进行自查。
    ```
 

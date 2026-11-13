@@ -23,7 +23,7 @@
   - PR 标题与 Commit Message 保持一致，不允许自创格式。
 
 - PR 描述：
-  - 禁止使用自动化工具自动创建 PR。需手工创建 PR 并按照 PR 模板正确填写 PR 描述。手工创建 PR 时 AtomGit 平台会显示 PR 模板。
+  - 代码推送和 PR 创建必须由人类完成，禁止自动化工具代替。PR 需按 AtomGit 模板正确填写，手工创建时平台会显示模板。
   - PR 描述需真实、准确。不允许将“搬运上游已有的 formula”与“手写全新的 formula”两种情况进行混淆。未进行实际业务修改的情况下不允许写“鸿蒙适配”。
 
 - PR 数量：
@@ -60,33 +60,25 @@
 
 ## 改动点审查
 
-- 必备的审查动作：
-  - 如果开源软件在上游 Homebrew/homebrew-core 中已存在，必须直接搬运上游 formula，严禁从零手写。
-  - 无论是基于上游 formula 进行适配，还是在现有 formula 基础上修改，都需确保改动点达到最少，使 formula 文件尽可能接近它在上游 Homebrew/homebrew-core 仓库中的状态。
-  - 如果是基于上游 formula 进行适配（Homebrew/homebrew-core 中存在，Harmonybrew/homebrew-core 尚未收录），提交 PR 前需要在本地将自己改过的 formula 与上游 Homebrew/homebrew-core 中的版本进行 diff，审查每一处变更的必要性。禁止引入冗余修改。
-  - 如果是现有 formula 基础上修改（Harmonybrew/homebrew-core 中已存在，需要进行修改），提交前需要仔细审查自己的改动点。禁止引入冗余修改。修改完业务代码后需要递增修订版本号。
+- 如果开源软件在上游 Homebrew/homebrew-core 中已存在，必须直接搬运上游 formula，严禁从零手写。
+- 提交前必须将当前 formula 与上游 Homebrew/homebrew-core 的版本做 diff，逐项确认变更必要性，禁止引入冗余修改。
+- 如果是现有 formula 基础上修改，修改完业务代码后需要递增修订版本号。
 
-- 重点审视的冗余修改：
-  - 无意义的构建参数。例如 `-I#{formula_opt_include("openssl@4")`、`-L#{formula_opt_lib("openssl@4")`（只要声明了 `depends_on "openssl@4"`，Homebrew superenv 会自动将这些参数注入给编译器）。
-  - 无意义的环境变量。例如 `ENV["AR"] = "llvm-ar"`、`ENV.append_path "PATH", "/storage/Users/currentUser/.harmonybrew/bin"`（这些已经是 Homebrew superenv 的默认行为）。
-  - 无意义的级联依赖。例如 `depends_on "make" => :build`、`depends_on "perl" => :build`（这些是所有 formula 的隐式依赖，在 Homebrew 生态中，formula 从不显式声明这些依赖，Harmonybrew 的 ci-runner 也已经在系统目录下预置了这些软件）。
-  - 上游未启用、且并非鸿蒙适配所必须的构建参数。
-  - 只在构建期生效的鸿蒙内核（uname 标识为 HarmonyOS）适配项（Harmonybrew 的 formula 从来不会在鸿蒙内核上构建，此类适配为冗余修改）。
-  - 网络相关的规避措施。例如在 formula 文件中配置国内镜像站、删除需要联网的测试用例等。Harmonybrew 的 CI 服务器在香港区域，可以流畅访问任何国外网站，所有针对网络的规避措施都是冗余修改。
+- 禁止改变 formula 在其他平台上的表现。所有鸿蒙适配内容必须被 `if OS.ohos?` 或 `unless OS.ohos?` 保护，并提供配套注释。
+- 禁止将 [build_in_harmonyos](https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos) 项目的构建参数和补丁搬运至本仓库。这不仅会引入大量冗余修改（该项目构建环境与 ci-runner 不同），还可能引发版权纠纷（补丁版权归属于原组织）。
+- 默认情况下禁止将 Homebrew/homebrew-core 以外的开源代码引入本仓库。不加声明地引入外来代码可能会将本项目置身于版权纠纷中。只有贡献者本人自研（含 AI 自研）的代码和 0BSD、MIT-0 这两种许可证的外来代码被允许合入本仓库。其他来源必须事先获得维护者批准，并按仓库的补丁来源规则声明来源和许可证。
+- 禁止人工修改 formula 文件内的 bottle 块。只能保持上游原样，或者整体删除并清理下方多余空行，确保原位置不会留下连续两个空行。
 
-- 被禁止的行为：
-  - 禁止改变 formula 在其他平台上的表现。在 formula 文件中，所有鸿蒙适配内容必须被 `if OS.ohos?` 或 `unless OS.ohos?` 保护（包括 `patch do`），并提供配套注释，不允许直接修改全局路径或 Linux 路径。
-  - 禁止将上游补丁搬运至仓库中。如果 formula 在上游（Homebrew/homebrew-core）存在仓内补丁，录入时需要以远程补丁的方式引入，而不是将上游补丁复制一份提交到下游仓库。
-  - 禁止进行功能性修改。软件包的行为需要尽可能与上游（Homebrew/homebrew-core）里面的版本行为一致，禁止对软件包进行与鸿蒙适配无关的功能增强。
-  - 禁止将 [build_in_harmonyos](https://atomgit.com/OpenHarmonyPCDeveloper/build_in_harmonyos) 项目的构建参数和补丁搬运至本仓库。这不仅会引入大量冗余修改（该项目构建环境与 ci-runner 不同），还可能引发版权纠纷（补丁版权归属于原组织）。
-  - 默认情况下禁止将 Homebrew/homebrew-core 以外的开源代码引入本仓库。不加声明地引入外来代码可能会将本项目置身于版权纠纷中。为避免增添无意义的维护工作量，只有贡献者本人自研（含 AI 自研）的代码和 0BSD、MIT-0 这两种许可证的外来代码被允许合入本仓库。
-  - 禁止人工修改 formula 文件内的 bottle 块。无论是基于上游 formula 进行适配，还是在现有 formula 基础上修改，都不允许手写其中的内容。只能采用两种处理方式之一：1. 将 bottle 块保持原样；2. 将 bottle 块整体删除（包括它下方的一个空行，确保删除后原位置不会有连续两个空行）。
-  - 在注释和 Commit Message 中默认禁止使用 HarmonyOS 这个词汇。只有两种情况可以使用这个词汇：1. 你解决的问题是 HarmonyOS 这个发行版特有的（例如鸿蒙内核相关问题）；2. 你需要特指华为鸿蒙 PC（HarmonyOS PC）这个设备。其他情况应使用 OpenHarmony 或其简称 OHOS。注意：应用沙箱和 hmdfs 并非 HarmonyOS 这个发行版特有，这些机制在 OpenHarmony 中同样有实现。
+## 最佳实践
+
+提交 PR 前必须阅读并遵循 [Formula 适配最佳实践](formula-best-practices.md)。该文档给出依赖处理、formula 写法、C/C++ 与平台适配、语言与平台适配、测试、补丁规范的统一做法。本文只规定提交门槛和硬性禁止项。
+
+如果两篇文档表述冲突，请在 PR 讨论区咨询维护者，以维护者给出的处理意见为准。
 
 ## 例外声明
 
 以上限制仅针对常规场景，并非所有 PR 都会遵循：
-- 维护者出于维护工作需求可能需要主动违反规则。例如在大批量维护软件包时可能会同时提交上千个 PR。
+- 维护者出于维护工作需求可能需要主动违反规则。例如在大批量维护软件包时，可能会使用自动化工具批量创建 PR。
 - 某些软件包可能存在特殊原因需要违反其中的规则。作者可在 PR 描述或 PR 讨论区中与维护者沟通，维护者会视情况例外放行。注意，“特殊”的门槛很高，请不要轻易认为自己特殊。
 
 部分 formula 是全量重写版本，已经与上游硬分叉，不具备最小化改造的条件：
