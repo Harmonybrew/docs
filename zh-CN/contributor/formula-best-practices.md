@@ -445,6 +445,21 @@ ENV.append "LDFLAGS", "-Wl,-z,global" if OS.ohos?
 
 **加之前先确认真的需要。** 只有“通过 `dlopen` 加载的模块要反解析宿主符号”时才需要这个 flag。如果插件只通过宿主注册的结构体/回调通信（`weechat`），或者插件自己链接了定义符号的库（`syslog-ng`），加了就是冗余。判断方法：`readelf -sW <插件>` 看未定义符号里有没有宿主导出的 API，没有就不加。
 
+还要区分符号提供者和消费者。`-Wl,-z,global` 只适用于当前 formula **定义**了这些符号、供插件反解析的情况。如果当前 formula 只是消费者，未定义符号来自另一个库，就不应该给自身加这个 flag，而应该直接链接提供符号的库。
+
+例如 `libgdiplus` 调用了 `pangoft2` 的 `pango_fc_font_map_set_config`，但 configure 只链接了 pangocairo。OpenHarmony 的 lld 不会沿 `DT_NEEDED` 间接解析这个符号，所以消费方应显式链接：
+
+```ruby
+ENV.append "LIBS", "-lpangoft2-1.0" if OS.ohos?
+```
+
+给 `libgdiplus` 自身加 `-Wl,-z,global` 不会定义它没有的符号。给 `pango` 全量加 `-Wl,-z,global` 则会把 pangoft2 的符号暴露给所有消费者，影响范围过大，也不是对应修复。
+
+判断顺序：
+
+- 符号由当前 formula 定义，供 `dlopen` 模块反解析：给提供符号的宿主加 `-Wl,-z,global`。
+- 符号由其他库定义，当前 formula 调用：直接链接定义符号的库，不要加 `-Wl,-z,global`。
+
 ### 5.4 SDK 头文件与 C23 的冲突
 
 新版 `ohos-sdk-native` 的 sysroot 头文件里有若干 K&R 风格的声明，例如：
