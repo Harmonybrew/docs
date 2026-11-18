@@ -879,7 +879,13 @@ replace example.com/foo => ./vendor/foo
 ### 8.1 原生模块与预编译包
 
 - 原生模块（`node-gyp`）会按 `process.platform` 判断平台，OpenHarmony 上报的值与 Linux 不同，需要在源码里补分支。
-- npm 可选依赖里的原生二进制包（`@esbuild/*`、`@opentui/core`、`lightningcss` 等）**不要复用 `linux-arm64-musl` 产物**：要么选带 `openharmony-arm64` 的版本，要么从源码现编。版本太旧没有 OHOS 产物时，用补丁升级该依赖的版本，而不是关掉功能。
+- npm 可选依赖里的原生二进制包（`@esbuild/*`、`@opentui/core`、`lightningcss` 等）优先选带 `openharmony-arm64` 的版本，或从源码现编。版本太旧没有 OHOS 产物时，用补丁升级该依赖的版本，而不是关掉功能。
+- **默认不要用 `linux-arm64-musl` 产物替代 OHOS 产物。** 例外仅限“构建期工具、不进入产物”的场景：确实没有 OHOS 包，也无法源码构建或使用 WASM，但该 musl 二进制与 OHOS 的 musl ABI 兼容，且只参与构建、不会被安装到 Cellar/bottle，也不会被最终可执行文件携带或运行态加载。使用这种特例时必须：
+  1. 在 formula 注释中说明它是构建期依赖、ABI 兼容的依据，以及为什么不能用 OHOS/WASM/源码构建；
+  2. 验证 `Cellar` 和 bottle 中没有该 `.node`、`.so` 或可执行文件；
+  3. 确认最终程序不加载它，也不把它嵌入产物。
+  
+  只要原生库会进入产物，或运行态需要加载，就仍然禁止使用 musl 制品；应继续等上游支持、自己构建 OHOS 版本，或关闭该功能并明确记录。
 - 解释器符号可见性问题见 5.3。
 
 ### 8.2 修改 node_modules
@@ -1152,7 +1158,7 @@ Patches/faircamp/0001-ohos-*.patch
 | CMake 探测被强制头文件干扰 | 显式设置 `-DHAVE_XXX` 或 `ac_cv_func_*`，不要依赖自动探测 | — |
 | cgo 的 `CGO_CFLAGS` 进入 `.S` 汇编 | 预编译依赖只加 `CGO_LDFLAGS`，不要把 C 头文件塞进汇编 | — |
 | 缺 `getpass` / `utmpx` / `qsort_r` / `fts` / shadow / pthread affinity | 优先接 `muslext`，按最小头文件注入，`pthread_cancel` 仍打补丁 | 见 5.5、5.6 |
-| npm 原生包只有 musl 产物 | 升到带 `openharmony-arm64` 的版本，或从源码现编 | `Formula/z/zrok.rb` |
+| npm 原生包只有 musl 产物 | 优先升到带 `openharmony-arm64` 的版本、从源码现编或改用 WASM；仅构建期使用且不进入产物时，才可使用 ABI 兼容的 musl 绑定，并注释用途、验证产物树 | `Formula/z/zrok.rb`、`Formula/b/backlog-md.rb` |
 | 依赖的包在 OHOS 上有缺陷 | 先修被依赖的包，再重编本包 | — |
 | 上游已 404 / 已 `disable!` | 不录入 | — |
 | 包确实无法适配 | 关闭 PR，不硬塞 workaround | — |
